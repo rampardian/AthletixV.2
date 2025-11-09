@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { convertToEmbed } from "@/utilities/utils";
 import { Progress } from "@/components/ui/progress";
 import {
   MapPin,
@@ -13,17 +14,37 @@ import {
   Trophy,
   Activity,
   Share2,
-  Award,
   TrendingUp,
-  Target,
-  Medal,
   ChevronLeft
 } from "lucide-react";
 import axios from "axios";
 
+interface Athlete {
+  id: string;
+  name: string;
+  sport: string;
+  position: string;
+  age: number | string;
+  gender: string;
+  location: string;
+  bio: string;
+  verification_status: string;
+  height?: number | null;
+  weight?: number | null;
+  jerseyNumber?: number | null;
+  email?: string | null;
+  contactNum?: string | null;
+  achievements?: Array<{ achievement_id: string; title: string; year?: number; description?: string }>;
+  videos?: Array<{ url: string }>;
+  education?: Array<{ school: string; degree?: string; field?: string; year?: string }>;
+  stats?: any;
+  imageUrl?: string;
+}
+
+
 const AthleteProfile = () => {
   const { id } = useParams();
-  const [athlete, setAthlete] = useState(null);
+  const [athlete, setAthlete] = useState<Athlete | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFollowing, setIsFollowing] = useState(false);
 
@@ -32,7 +53,6 @@ const AthleteProfile = () => {
     const fetchAthlete = async () => {
       try {
         const res = await axios.get(`http://localhost:5000/api/athletes/${id}`);
-        console.log("Fetched athlete:", res.data);
         setAthlete(res.data);
       } catch (err) {
         console.error("Failed to load athlete:", err);
@@ -83,7 +103,15 @@ const AthleteProfile = () => {
                 <div>
                   <div className="flex items-center gap-2 mb-2">
                     <h1 className="text-3xl font-bold">{athlete.name}</h1>
-                    {athlete.verified && <Badge variant="secondary">Verified</Badge>}
+                    <Badge
+                      className={
+                        athlete.verification_status === "verified"
+                          ? "bg-black text-white"
+                          : "bg-gray-400 text-white" //logo for not verified
+                      }
+                    >
+                      {athlete.verification_status === "verified" ? "Verified" : "Unverified"}
+                    </Badge>
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-muted-foreground mb-4">
                     <span className="flex items-center gap-1">
@@ -93,10 +121,6 @@ const AthleteProfile = () => {
                     <span className="flex items-center gap-1">
                       <MapPin className="h-4 w-4" />
                       {athlete.location}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-4 w-4" />
-                      Joined {athlete.joinDate}
                     </span>
                   </div>
                   <p className="text-muted-foreground max-w-2xl">{athlete.bio}</p>
@@ -136,15 +160,15 @@ const AthleteProfile = () => {
                   <p className="text-sm text-muted-foreground">Age</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{athlete.height}</p>
+                  <p className="text-2xl font-bold">{athlete.height || "N/A"}</p>
                   <p className="text-sm text-muted-foreground">Height (cm)</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{athlete.weight}</p>
+                  <p className="text-2xl font-bold">{athlete.weight || "N/A"}</p>
                   <p className="text-sm text-muted-foreground">Weight (kg)</p>
                 </div>
                 <div>
-                  <p className="text-2xl font-bold">{athlete.jerseyNumber}</p>
+                  <p className="text-2xl font-bold">{athlete.jerseyNumber || "N/A"}</p>
                   <p className="text-sm text-muted-foreground">Jersey</p>
                 </div>
               </div>
@@ -157,7 +181,7 @@ const AthleteProfile = () => {
           <TabsList className="grid w-full grid-cols-4 max-w-2xl">
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
-            <TabsTrigger value="videos">Videos</TabsTrigger>
+            <TabsTrigger value="videos">Highlights</TabsTrigger>
             <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
 
@@ -187,38 +211,36 @@ const AthleteProfile = () => {
 
           <TabsContent value="achievements" className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {athlete.achievements?.length
-                ? athlete.achievements.map((achievement) => {
-                    const Icon = achievement.icon || Trophy;
-                    return (
-                      <Card key={achievement.id}>
-                        <CardContent className="flex items-center gap-4 p-6">
-                          <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                            <Icon className="h-6 w-6 text-primary" />
-                          </div>
-                          <div className="flex-1">
-                            <h3 className="font-semibold">{achievement.title}</h3>
-                            {achievement.description && (
-                              <p className="text-sm text-muted-foreground">{achievement.description}</p>
-                            )}
-                            {achievement.year && (
-                              <p className="text-xs text-muted-foreground mt-1">Year: {achievement.year}</p>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    );
-                  })
-                : (
-                  <Card>
-                    <CardContent className="p-8 text-center text-muted-foreground">
-                      <Trophy className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                      <p>No achievements yet.</p>
+              {athlete.achievements?.length ? (
+                athlete.achievements.map((achievement) => (
+                  <Card key={achievement.achievement_id}>
+                    <CardContent className="flex items-center gap-4 p-6">
+                      <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                        <Trophy className="h-6 w-6 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-semibold">{achievement.title}</h3>
+                        {achievement.description && (
+                          <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                        )}
+                        {achievement.year && (
+                          <p className="text-xs text-muted-foreground mt-1">Year: {achievement.year}</p>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
-                )}
+                ))
+              ) : (
+                <Card>
+                  <CardContent className="p-8 text-center text-muted-foreground">
+                    <Trophy className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No achievements yet.</p>
+                  </CardContent>
+                </Card>
+              )}
             </div>
           </TabsContent>
+
 
           <TabsContent value="videos" className="space-y-6">
             <Card>
@@ -227,7 +249,11 @@ const AthleteProfile = () => {
                   <iframe
                     width="100%"
                     height="100%"
-                    src={athlete.videos?.[0]?.url || "https://www.youtube.com/embed/dQw4w9WgXcQ"}
+                    src={
+                      athlete.videos?.[0]?.url
+                        ? convertToEmbed(athlete.videos[0].url)
+                        : "https://www.youtube.com/embed/dQw4w9WgXcQ"
+                    }
                     title="Athlete Highlight Video"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"

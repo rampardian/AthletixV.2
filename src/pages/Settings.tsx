@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "@/components/layout/Navbar";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,21 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/utilities/utils";
+import axios from "axios";
 import { toast } from "sonner";
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Lock, 
-  Bell, 
-  Eye, 
+import { useAuth } from "@/hooks/useAuth";
+import { validatePassword } from "@/utilities/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { convertToEmbed } from "@/utilities/utils";
+
+
+import {
+  User,
+  Mail,
+  Phone,
+  MapPin,
+  Lock,
+  Eye,
   EyeOff,
   Save,
   ArrowLeft,
@@ -29,21 +35,53 @@ import {
   GraduationCap,
   Plus,
   X,
-  Award,
   Instagram,
   Twitter,
   Facebook,
-  Linkedin,
   CalendarIcon,
   Ruler,
   Weight,
-  Hash
+  Hash,
 } from "lucide-react";
+
+interface FormData {
+  fullname: string;
+  email: string;
+  phone: string;
+  location: string;
+  position: string;
+  height: string;
+  weight: string;
+  jerseyNumber: string;
+  birthdate: string | null;
+  bio: string;
+  videoUrl?: string;
+  currentPassword?: string;
+  newPassword?: string;
+  confirmPassword?: string;
+}
+
+interface Achievement {
+  achievement_id?: string;
+  title: string;
+  year: string;
+  description: string;
+}
+
+interface Education {
+  education_id?: string;
+  school: string;
+  degree: string;
+  field: string;
+  startYear: string;
+  endYear: string;
+}
+
 
 const regions = [
   "NCR",
   "Region I",
-  "Region II", 
+  "Region II",
   "Region III",
   "Region IV-A",
   "Region IV-B",
@@ -62,139 +100,237 @@ const regions = [
 
 const Settings = () => {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
+  const { session, user, loading: authLoading } = useAuth();
+
   const [loading, setLoading] = useState(false);
-  
-  const [formData, setFormData] = useState({
-    fullname: "John Doe",
-    email: "john.doe@example.com",
-    phone: "+1 (555) 123-4567",
-    region: "NCR",
-    position: "Point Guard",
-    height: "180",
-    weight: "75",
-    jerseyNumber: "23",
-    birthday: null as Date | null,
-    instagram: "",
-    twitter: "",
-    facebook: "",
-    currentPassword: "",
-    newPassword: "",
-    confirmPassword: "",
-    bio: "Professional athlete passionate about sports and competition.",
+  const [formData, setFormData] = useState<FormData>({
+    fullname: "",
+    email: "",
+    phone: "",
+    location: "NCR",
+    position: "",
+    height: "",
+    weight: "",
+    jerseyNumber: "",
+    birthdate: null,
+    bio: "",
+    videoUrl: "",
   });
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [education, setEducation] = useState<Education[]>([]);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [achievements, setAchievements] = useState([
-    { id: 1, title: "State Championship Winner", year: "2023", description: "Won the state basketball championship" },
-    { id: 2, title: "MVP Award", year: "2022", description: "Most Valuable Player of the season" }
-  ]);
 
-  const [education, setEducation] = useState([
-    { 
-      id: 1, 
-      school: "University of California", 
-      degree: "Bachelor of Science", 
-      field: "Sports Management", 
-      startYear: "2020", 
-      endYear: "2024",
-      gpa: "3.8"
+  // Fetch data when user is available
+  useEffect(() => {
+  const fetchSettings = async () => {
+    if (!session || !user) return;
+    setLoading(true);
+
+    try {
+      const response = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }
+      );
+
+      const { user: userData, achievements, education } = response.data;
+
+      setFormData({
+        fullname: userData.fullname || "",
+        email: userData.email || "",
+        phone: userData.contact_num || "",
+        location: userData.location || "",
+        position: userData.position || "",
+        height: userData.height_cm?.toString() || "",
+        weight: userData.weight_kg?.toString() || "",
+        jerseyNumber: userData.jersey_number?.toString() || "",
+        birthdate: userData.birthdate || null, 
+        bio: userData.bio || "",
+        videoUrl: userData.video_highlight || "",
+      });
+
+      setAchievements(achievements || []);
+      setEducation(
+  (education || []).map((edu: any) => ({
+    education_id: edu.education_id,
+    school: edu.school || "",
+    degree: edu.degree || "",
+    field: edu.field || "",
+    startYear: edu.start_year?.toString() || "",
+    endYear: edu.end_year?.toString() || "",
+  }))
+);
+
+    } catch (error) {
+      console.error("Error fetching settings:", error);
+      toast.error("Failed to fetch settings");
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
 
-  const [locations, setLocations] = useState([
-    { id: 1, type: "Home", address: "123 Main St, New York, NY 10001", isPrimary: true },
-    { id: 2, type: "Training", address: "456 Sports Center Ave, New York, NY 10002", isPrimary: false }
-  ]);
+  fetchSettings();
+}, [session, user]);
 
+  // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
+  // Handle date change
   const handleDateChange = (date: Date | undefined) => {
-    setFormData(prev => ({ ...prev, birthday: date || null }));
-  };
+  setFormData((prev) => ({
+    ...prev,
+    birthdate: date ? date.toISOString().split("T")[0] : null,
+  }));
+};
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // Handle save changes 
+const handleSave = async () => {
+  if (!session || !user) {
+    toast.error("User not authenticated");
+    return;
+  }
+
+  const embedUrl = convertToEmbed(formData.videoUrl);
+
+  try {
+    await axios.put(
+  `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
+  {
+    user: {
+      fullname: formData.fullname,
+      email: formData.email,
+      contact_num: formData.phone,
+      location: formData.location,
+      position: formData.position,
+      height: parseFloat(formData.height) || null,
+      weight: parseFloat(formData.weight) || null,
+      jersey_number: parseInt(formData.jerseyNumber) || null,
+      birthdate: formData.birthdate,
+      bio: formData.bio,
+      video_url: convertToEmbed(formData.videoUrl ?? null),
+    },
+    achievements,
+    education,
+  },
+  {
+    headers: { Authorization: `Bearer ${session.access_token}` },
+  }
+);
     
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      toast.success("Settings updated successfully!");
-    }, 1000);
+    toast.success("Profile updated successfully!");
+  } catch (error: any) {
+    console.error("Error saving account settings:", error);
+    toast.error(error.response?.data?.message || "Failed to save changes");
+  }
+};
+  // Handle password update
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!session || !user) {
+    toast.error("User not authenticated");
+    return;
+  }
+
+  const { currentPassword, newPassword, confirmPassword } = formData;
+
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    toast.error("All password fields are required");
+    return;
+  }
+
+  if (newPassword !== confirmPassword) {
+    toast.error("New passwords do not match");
+    return;
+  }
+
+  const { isValid, criteria } = validatePassword(newPassword);
+  if (!isValid) {
+    const unmet = Object.entries(criteria)
+      .filter(([_, met]) => !met)
+      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
+    toast.error(`Password must include: ${unmet.join(", ")}`);
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/update-password`, {
+      email: user.email,
+      currentPassword,
+      newPassword,
+      confirmPassword,
+    });
+
+    toast.success("Password updated successfully!");
+    setFormData((prev) => ({
+      ...prev,
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    }));
+  } catch (err: any) {
+    console.error("Backend password update error:", err);
+    toast.error(err.response?.data?.message || "Failed to update password");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+  // Achievements management
+  const addAchievement = () =>
+    setAchievements([...achievements, { title: "", year: "", description: "" }]);
+
+  const updateAchievement = (index: number, field: string, value: string) => {
+    const updated = [...achievements];
+    updated[index] = { ...updated[index], [field]: value };
+    setAchievements(updated);
   };
 
-  const addAchievement = () => {
-    const newId = Math.max(...achievements.map(a => a.id), 0) + 1;
-    setAchievements([...achievements, { id: newId, title: "", year: "", description: "" }]);
+  const removeAchievement = (index: number) =>
+    setAchievements(achievements.filter((_, i) => i !== index));
+
+  // Education management
+  const addEducation = () =>
+    setEducation([...education, { school: "", degree: "", field: "", startYear: "", endYear: "" }]);
+
+  const updateEducation = (index: number, field: string, value: string) => {
+    const updated = [...education];
+    updated[index] = { ...updated[index], [field]: value };
+    setEducation(updated);
   };
 
-  const removeAchievement = (id: number) => {
-    setAchievements(achievements.filter(a => a.id !== id));
-  };
+  const removeEducation = (index: number) =>
+    setEducation(education.filter((_, i) => i !== index));
 
-  const updateAchievement = (id: number, field: string, value: string) => {
-    setAchievements(achievements.map(a => 
-      a.id === id ? { ...a, [field]: value } : a
-    ));
-  };
-
-  const addEducation = () => {
-    const newId = Math.max(...education.map(e => e.id), 0) + 1;
-    setEducation([...education, { 
-      id: newId, 
-      school: "", 
-      degree: "", 
-      field: "", 
-      startYear: "", 
-      endYear: "",
-      gpa: ""
-    }]);
-  };
-
-  const removeEducation = (id: number) => {
-    setEducation(education.filter(e => e.id !== id));
-  };
-
-  const updateEducation = (id: number, field: string, value: string) => {
-    setEducation(education.map(e => 
-      e.id === id ? { ...e, [field]: value } : e
-    ));
-  };
-
-  const addLocation = () => {
-    const newId = Math.max(...locations.map(l => l.id), 0) + 1;
-    setLocations([...locations, { id: newId, type: "", address: "", isPrimary: false }]);
-  };
-
-  const removeLocation = (id: number) => {
-    setLocations(locations.filter(l => l.id !== id));
-  };
-
-  const updateLocation = (id: number, field: string, value: string | boolean) => {
-    setLocations(locations.map(l => 
-      l.id === id ? { ...l, [field]: value } : l
-    ));
-  };
+  // Handle region selection
+  const handleSelectChange = (field: string, value: string) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
+``
+  // If still loading auth
+  if (authLoading || loading) {
+    return (
+      <div className="flex h-screen items-center justify-center text-muted-foreground">
+        Loading settings...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         {/* Header */}
         <div className="mb-8">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="mb-4"
-          >
+          <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
@@ -204,516 +340,284 @@ const Settings = () => {
           </p>
         </div>
 
-        {/* Settings Tabs */}
+        {/* Tabs */}
         <Tabs defaultValue="account" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="account">Account</TabsTrigger>
             <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
-          {/* Account Tab */}
+          {/* ACCOUNT TAB */}
           <TabsContent value="account">
             <Card className="mb-2">
               <CardHeader>
                 <CardTitle>Account Details</CardTitle>
-                <CardDescription>
-                  Update your account information
-                </CardDescription>
+                <CardDescription>Update your account information</CardDescription>
               </CardHeader>
               <CardContent>
-                <form onSubmit={handleSubmit} className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="fullname">
-                      <User className="inline-block mr-2 h-4 w-4" />
-                      Full Name
-                    </Label>
-                    <Input
-                      id="fullname"
-                      name="fullname"
-                      value={formData.fullname}
-                      onChange={handleInputChange}
-                      placeholder="Enter your full name"
-                    />
-                  </div>
-
+                <div className="space-y-4">
+                  <Label htmlFor="fullname">
+                    <User className="inline-block mr-2 h-4 w-4" /> Full Name
+                  </Label>
+                  <Input id="fullname" name="fullname" value={formData.fullname} onChange={handleInputChange} />
                   <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="email">
-                      <Mail className="inline-block mr-2 h-4 w-4" />
-                      Email
-                    </Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Enter your email"
-                    />
-                  </div>
-
+                  <Label htmlFor="email">
+                    <Mail className="inline-block mr-2 h-4 w-4" /> Email
+                  </Label>
+                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
                   <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">
-                      <Phone className="inline-block mr-2 h-4 w-4" />
-                      Phone
-                    </Label>
-                    <Input
-                      id="phone"
-                      name="phone"
-                      type="tel"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="Enter your phone number"
-                    />
-                  </div>
-
+                  <Label htmlFor="phone">
+                    <Phone className="inline-block mr-2 h-4 w-4" /> Phone
+                  </Label>
+                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
                   <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="region">
-                      <MapPin className="inline-block mr-2 h-4 w-4" />
-                      Region
-                    </Label>
-                    <Select value={formData.region} onValueChange={(value) => handleSelectChange('region', value)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your region" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {regions.map((region) => (
-                          <SelectItem key={region} value={region}>
-                            {region}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
+                  <Label htmlFor="region">
+                    <MapPin className="inline-block mr-2 h-4 w-4" /> Region
+                  </Label>
+                  <Select value={formData.location} onValueChange={(value) => handleSelectChange("location", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your region" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {regions.map((region) => (
+                        <SelectItem key={region} value={region}>
+                          {region}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="position">Position</Label>
-                    <Input
-                      id="position"
-                      name="position"
-                      value={formData.position}
-                      onChange={handleInputChange}
-                      placeholder="e.g., Point Guard, Center, Striker"
-                    />
-                  </div>
-
+                  <Label htmlFor="position">Position</Label>
+                  <Input id="position" name="position" value={formData.position} onChange={handleInputChange} />
                   <Separator />
-
                   <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
+                    <div>
                       <Label htmlFor="height">
-                        <Ruler className="inline-block mr-2 h-4 w-4" />
-                        Height (cm)
+                        <Ruler className="inline-block mr-2 h-4 w-4" /> Height (cm)
                       </Label>
-                      <Input
-                        id="height"
-                        name="height"
-                        value={formData.height}
-                        onChange={handleInputChange}
-                        placeholder="180"
-                      />
+                      <Input id="height" name="height" value={formData.height} onChange={handleInputChange} />
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label htmlFor="weight">
-                        <Weight className="inline-block mr-2 h-4 w-4" />
-                        Weight (kg)
+                        <Weight className="inline-block mr-2 h-4 w-4" /> Weight (kg)
                       </Label>
-                      <Input
-                        id="weight"
-                        name="weight"
-                        value={formData.weight}
-                        onChange={handleInputChange}
-                        placeholder="75"
-                      />
+                      <Input id="weight" name="weight" value={formData.weight} onChange={handleInputChange} />
                     </div>
-                    <div className="space-y-2">
+                    <div>
                       <Label htmlFor="jerseyNumber">
-                        <Hash className="inline-block mr-2 h-4 w-4" />
-                        Jersey Number
+                        <Hash className="inline-block mr-2 h-4 w-4" /> Jersey Number
                       </Label>
                       <Input
                         id="jerseyNumber"
                         name="jerseyNumber"
                         value={formData.jerseyNumber}
                         onChange={handleInputChange}
-                        placeholder="23"
                       />
                     </div>
                   </div>
-
                   <Separator />
-
-                  <div className="space-y-2">
-                    <Label>
-                      <CalendarIcon className="inline-block mr-2 h-4 w-4" />
-                      Birthday
-                    </Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !formData.birthday && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {formData.birthday ? format(formData.birthday, "PPP") : "Pick a date"}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0">
-                        <Calendar
-                          mode="single"
-                          selected={formData.birthday || undefined}
-                          onSelect={handleDateChange}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <Label className="text-base font-semibold">Social Media Links</Label>
-                    <div className="grid grid-cols-1 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="instagram">
-                          <Instagram className="inline-block mr-2 h-4 w-4" />
-                          Instagram
-                        </Label>
-                        <Input
-                          id="instagram"
-                          name="instagram"
-                          value={formData.instagram}
+                  <Label>
+                    <CalendarIcon className="inline-block mr-2 h-4 w-4" /> Birthday
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn("w-full justify-start text-left font-normal", !formData.birthdate && "text-muted-foreground")}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.birthdate ? format(new Date(formData.birthdate), "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.birthdate ? new Date(formData.birthdate) : undefined}
+                        onSelect={handleDateChange}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <div> 
+                      <Label htmlFor="bio">Bio</Label>
+                      <div>
+                        <textarea
+                          id="bio"
+                          name="bio"
+                          className="w-full h-40 border rounded-md p-2 text-sm"
+                          rows={4}
+                          value={formData.bio}
                           onChange={handleInputChange}
-                          placeholder="https://instagram.com/yourusername"
                         />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="twitter">
-                          <Twitter className="inline-block mr-2 h-4 w-4" />
-                          Twitter
-                        </Label>
-                        <Input
-                          id="twitter"
-                          name="twitter"
-                          value={formData.twitter}
-                          onChange={handleInputChange}
-                          placeholder="https://twitter.com/yourusername"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="facebook">
-                          <Facebook className="inline-block mr-2 h-4 w-4" />
-                          Facebook
-                        </Label>
-                        <Input
-                          id="facebook"
-                          name="facebook"
-                          value={formData.facebook}
-                          onChange={handleInputChange}
-                          placeholder="https://facebook.com/yourusername"
-                        />
-                      </div>
                     </div>
-                  </div>
-
-                  <Separator />
-
-                  <div className="space-y-2">
-                    <Label htmlFor="bio">Bio</Label>
-                    <textarea
-                      id="bio"
-                      name="bio"
-                      value={formData.bio}
-                      onChange={handleInputChange}
-                      rows={4}
-                      className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                      placeholder="Tell us about yourself"
-                    />
-                  </div>
-
-                  
-                </form>
-              </CardContent>
-            </Card>
-
-            {/* Locations Section */}
-            <Card className="mb-2">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Locations
-                    </CardTitle>
-                    <CardDescription>
-                      Manage your locations (home, training, etc.)
-                    </CardDescription>
-                  </div>
-                  <Button onClick={addLocation} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Location
-                  </Button>
                 </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {locations.map((location) => (
-                  <Card key={location.id} className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <div className="grid grid-cols-2 gap-4 flex-1">
-                          <div className="space-y-2">
-                            <Label htmlFor={`location-type-${location.id}`}>Type</Label>
-                            <Input
-                              id={`location-type-${location.id}`}
-                              value={location.type}
-                              onChange={(e) => updateLocation(location.id, 'type', e.target.value)}
-                              placeholder="e.g., Home, Training, Work"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`location-address-${location.id}`}>Address</Label>
-                            <Input
-                              id={`location-address-${location.id}`}
-                              value={location.address}
-                              onChange={(e) => updateLocation(location.id, 'address', e.target.value)}
-                              placeholder="Full address"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeLocation(location.id)}
-                          className="ml-2"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          id={`primary-${location.id}`}
-                          checked={location.isPrimary}
-                          onChange={(e) => updateLocation(location.id, 'isPrimary', e.target.checked)}
-                          className="rounded border-gray-300"
-                        />
-                        <Label htmlFor={`primary-${location.id}`}>Primary Location</Label>
-                      </div>
+                </div>
+                {/* Video Highlight Section */}
+                <Card className="mt-4">
+                  <CardHeader>
+                    <CardTitle className="text-lg font-semibold">Video Highlight</CardTitle>
+                    <CardDescription>Paste a link to your video highlight</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-1">
+                    <textarea
+                      value={formData.videoUrl || 'https://www.youtube.com/embed/dQw4w9WgXcQ'}
+                      onChange={(e) =>
+                        setFormData({ ...formData, videoUrl: e.target.value })
+                      }
+                      placeholder="Paste your video highlight link here"
+                      className="w-full h-24 border rounded-md p-2 text-sm resize-none"
+
+                    />
+
+                    {/* Clickable label below the textarea */}
+                    <div className="text-left">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <span className="text-blue-500 text-sm underline cursor-pointer">
+                            How?
+                          </span>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>How to Get Your YouTube Video Link</DialogTitle>
+                            <DialogDescription>
+                              Follow these steps to get the proper YouTube link to embed:
+                              <ol className="list-decimal list-inside mt-2 space-y-1 text-sm text-gray-700">
+                                <li>
+                                  Go to <a href="https://www.youtube.com" target="_blank" className="text-blue-500 underline">YouTube</a> and open your video.
+                                </li>
+                                <li>Click the <strong>Share</strong> button below the video.</li>
+                                <li>Copy the URL provided (e.g., <code>https://www.youtube.com/watch?v=XXXXXX</code>).</li>
+                                <li>Paste this link into the Video Highlight textarea above.</li>
+                                <li>Do not use shortened URLs or embedded code; only full YouTube URLs are accepted.</li>
+                              </ol>
+                            </DialogDescription>
+                          </DialogHeader>
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  </Card>
-                ))}
+                  </CardContent>
+                </Card>
               </CardContent>
             </Card>
 
             {/* Achievements Section */}
-            <Card>
+            <Card className="mt-4">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <Trophy className="h-5 w-5" />
-                      Achievements & Awards
+                      <Trophy className="h-5 w-5" /> Achievements
                     </CardTitle>
-                    <CardDescription>
-                      Showcase your accomplishments and awards
-                    </CardDescription>
+                    <CardDescription>Showcase your accomplishments</CardDescription>
                   </div>
                   <Button onClick={addAchievement} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Achievement
+                    <Plus className="mr-2 h-4 w-4" /> Add Achievement
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {achievements.map((achievement) => (
-                  <Card key={achievement.id} className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div className="grid grid-cols-2 gap-4 flex-1">
-                          <div className="space-y-2">
-                            <Label htmlFor={`achievement-title-${achievement.id}`}>Title</Label>
-                            <Input
-                              id={`achievement-title-${achievement.id}`}
-                              value={achievement.title}
-                              onChange={(e) => updateAchievement(achievement.id, 'title', e.target.value)}
-                              placeholder="Achievement title"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`achievement-year-${achievement.id}`}>Year</Label>
-                            <Input
-                              id={`achievement-year-${achievement.id}`}
-                              value={achievement.year}
-                              onChange={(e) => updateAchievement(achievement.id, 'year', e.target.value)}
-                              placeholder="Year received"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeAchievement(achievement.id)}
-                          className="ml-2"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor={`achievement-description-${achievement.id}`}>Description</Label>
-                        <textarea
-                          id={`achievement-description-${achievement.id}`}
-                          value={achievement.description}
-                          onChange={(e) => updateAchievement(achievement.id, 'description', e.target.value)}
-                          rows={3}
-                          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                          placeholder="Describe your achievement"
-                        />
-                      </div>
+                {achievements.map((achievement, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        placeholder="Title"
+                        value={achievement.title}
+                        onChange={(e) => updateAchievement(index, "title", e.target.value)}
+                      />
+                      <Input
+                        placeholder="Year"
+                        value={achievement.year}
+                        onChange={(e) => updateAchievement(index, "year", e.target.value)}
+                      />
                     </div>
+                    <textarea
+                      className="w-full border rounded-md mt-2 p-2 text-sm"
+                      placeholder="Description"
+                      value={achievement.description}
+                      onChange={(e) => updateAchievement(index, "description", e.target.value)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 text-red-500"
+                      onClick={() => removeAchievement(index)}
+                    >
+                      <X className="h-4 w-4 mr-1" /> Remove
+                    </Button>
                   </Card>
                 ))}
               </CardContent>
             </Card>
 
             {/* Education Section */}
-            <Card className="mt-2">
+            <Card className="mt-4">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
-                      <GraduationCap className="h-5 w-5" />
-                      Education & Schools
+                      <GraduationCap className="h-5 w-5" /> Education
                     </CardTitle>
-                    <CardDescription>
-                      Add your educational background and qualifications
-                    </CardDescription>
+                    <CardDescription>Your academic background</CardDescription>
                   </div>
                   <Button onClick={addEducation} size="sm">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Education
+                    <Plus className="mr-2 h-4 w-4" /> Add Education
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                {education.map((edu) => (
-                  <Card key={edu.id} className="p-4">
-                    <div className="space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div className="grid grid-cols-2 gap-4 flex-1">
-                          <div className="space-y-2">
-                            <Label htmlFor={`school-${edu.id}`}>School/Institution</Label>
-                            <Input
-                              id={`school-${edu.id}`}
-                              value={edu.school}
-                              onChange={(e) => updateEducation(edu.id, 'school', e.target.value)}
-                              placeholder="School name"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`degree-${edu.id}`}>Degree</Label>
-                            <Input
-                              id={`degree-${edu.id}`}
-                              value={edu.degree}
-                              onChange={(e) => updateEducation(edu.id, 'degree', e.target.value)}
-                              placeholder="Degree type"
-                            />
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => removeEducation(edu.id)}
-                          className="ml-2"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`field-${edu.id}`}>Field of Study</Label>
-                          <Input
-                            id={`field-${edu.id}`}
-                            value={edu.field}
-                            onChange={(e) => updateEducation(edu.id, 'field', e.target.value)}
-                            placeholder="Major/Field"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`start-year-${edu.id}`}>Start Year</Label>
-                          <Input
-                            id={`start-year-${edu.id}`}
-                            value={edu.startYear}
-                            onChange={(e) => updateEducation(edu.id, 'startYear', e.target.value)}
-                            placeholder="2020"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor={`end-year-${edu.id}`}>End Year</Label>
-                          <Input
-                            id={`end-year-${edu.id}`}
-                            value={edu.endYear}
-                            onChange={(e) => updateEducation(edu.id, 'endYear', e.target.value)}
-                            placeholder="2024"
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor={`gpa-${edu.id}`}>GPA (Optional)</Label>
-                          <Input
-                            id={`gpa-${edu.id}`}
-                            value={edu.gpa}
-                            onChange={(e) => updateEducation(edu.id, 'gpa', e.target.value)}
-                            placeholder="3.8"
-                          />
-                        </div>
-                      </div>
+                {education.map((edu, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="space-y-2">
+                    <Input
+                      placeholder="School"
+                      value={edu.school}
+                      onChange={(e) => updateEducation(index, "school", e.target.value)}
+                    />
+                    <Input
+                      placeholder="Degree"
+                      value={edu.degree}
+                      onChange={(e) => updateEducation(index, "degree", e.target.value)}
+                    />
+                    <Input
+                      placeholder="Field"
+                      value={edu.field}
+                      onChange={(e) => updateEducation(index, "field", e.target.value)}
+                    />
+                    <div className="grid grid-cols-2 gap-4 mt-2">
+                      <Input
+                        placeholder="Start Year"
+                        value={edu.startYear}
+                        onChange={(e) => updateEducation(index, "startYear", e.target.value)}
+                      />
+                      <Input
+                        placeholder="End Year"
+                        value={edu.endYear}
+                        onChange={(e) => updateEducation(index, "endYear", e.target.value)}
+                      />
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 text-red-500"
+                      onClick={() => removeEducation(index)}
+                    >
+                      <X className="h-4 w-4 mr-1" /> Remove
+                    </Button>
                     </div>
                   </Card>
                 ))}
               </CardContent>
             </Card>
-                <div className="flex justify-end gap-3 mt-4">
-                    <Button type="button" variant="outline" onClick={() => navigate(-1)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={loading}>
-                      {loading ? (
-                        <>Saving...</>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Changes
-                        </>
-                      )}
-                    </Button>
-                  </div>
-            {/* Danger Zone */}
-            <Card className="border-red-200 mt-4">
-              <CardHeader>
-                <CardTitle className="text-red-600">Danger Zone</CardTitle>
-                <CardDescription>
-                  Irreversible and destructive actions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button variant="destructive">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Account
-                </Button>
-              </CardContent>
-            </Card>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => navigate(-1)}>
+                Cancel
+              </Button>
+              <Button onClick={handleSave} disabled={loading}>
+                {loading ? "Saving..." : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
+              </Button>
+            </div>
           </TabsContent>
 
           {/* Security Tab */}
@@ -729,7 +633,7 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <form className="space-y-6">
+                <form className="space-y-6" onSubmit={handleSubmit}>
                   <div className="space-y-2">
                     <Label htmlFor="currentPassword">Current Password</Label>
                     <div className="relative">
@@ -739,7 +643,6 @@ const Settings = () => {
                         type={showPassword ? "text" : "password"}
                         value={formData.currentPassword}
                         onChange={handleInputChange}
-                        placeholder="Enter current password"
                       />
                       <Button
                         type="button"
@@ -767,8 +670,21 @@ const Settings = () => {
                       type="password"
                       value={formData.newPassword}
                       onChange={handleInputChange}
-                      placeholder="Enter new password"
                     />
+                    {formData.newPassword && (
+                      <ul className="text-sm text-muted-foreground mt-1">
+                        {Object.entries(validatePassword(formData.newPassword).criteria).map(([rule, met]) => (
+                          <li key={rule} className={cn("flex items-center gap-2", met ? "text-green-600" : "text-red-600")}>
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: met ? "green" : "red" }}></span>
+                            {rule === "minLength" && "At least 8 characters"}
+                            {rule === "hasUppercase" && "Contains uppercase letter"}
+                            {rule === "hasLowercase" && "Contains lowercase letter"}
+                            {rule === "hasNumber" && "Contains a number"}
+                            {rule === "hasSpecialChar" && "Contains a special character"}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -779,7 +695,6 @@ const Settings = () => {
                       type="password"
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
-                      placeholder="Confirm new password"
                     />
                   </div>
 
@@ -796,69 +711,7 @@ const Settings = () => {
               </CardContent>
             </Card>
           </TabsContent>
-
-          {/* Notifications Tab */}
-          <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  Notification Preferences
-                </CardTitle>
-                <CardDescription>
-                  Manage how you receive notifications
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Email Notifications</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Receive notifications via email
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Enabled
-                  </Button>
-                </div>
-                
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Push Notifications</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Receive push notifications on your device
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Enabled
-                  </Button>
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="font-medium">Event Reminders</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Get reminded about upcoming events
-                    </p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Enabled
-                  </Button>
-                </div>
-
-                <div className="flex justify-end mt-6">
-                  <Button disabled={loading}>
-                    <Save className="mr-2 h-4 w-4" />
-                    Save Preferences
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          
         </Tabs>
       </div>
     </div>

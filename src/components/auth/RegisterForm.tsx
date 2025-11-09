@@ -13,7 +13,6 @@ import { toast } from "sonner";
 import { cn } from "@/utilities/utils";
 import RegistrationStep2 from "./RegistrationStep2";
 import { validatePassword } from "@/utilities/utils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type UserRole = "athlete" | "scout" | "organizer";
 type Gender = "male" | "female" | "other";

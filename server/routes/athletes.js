@@ -1,10 +1,9 @@
-// server/routes/athletes.js
 import express from "express";
 import { supabase } from "../supabaseClient.js";
 
 const router = express.Router();
 
-// ✅ Fetch all athletes
+//routes fetching all athletes
 router.get("/", async (req, res) => {
   try {
     const { data: users, error: userError } = await supabase
@@ -27,14 +26,12 @@ router.get("/", async (req, res) => {
     if (userError) throw userError;
     if (!users) return res.json([]);
 
-    // Fetch user details in one query
     const { data: details, error: detailsError } = await supabase
       .from("user_details")
       .select("*");
 
     if (detailsError) throw detailsError;
 
-    // Merge user info with user_details
     const athletes = users.map((user) => {
       const detail = details.find((d) => d.user_id === user.user_id);
       const age =
@@ -47,16 +44,16 @@ router.get("/", async (req, res) => {
         name: user.fullname,
         sport: user.sport_name || "",
         position: detail?.position || "",
-        age: age,
+        age,
         gender: user.gender || "",
         location: user.location || "",
-        achievements: 0, // placeholder
+        achievements: 0,
         stats: [
           { label: "PPG", value: "0.0" },
           { label: "RPG", value: "0.0" },
           { label: "APG", value: "0.0" },
         ],
-        verified: user.verification_status === "verified",
+        verification_status: user.verification_status,
       };
     });
 
@@ -64,6 +61,81 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to load athletes" });
+  }
+});
+
+//route fetching single athlete by id (for profile page)
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select(`
+        user_id,
+        fullname,
+        sport_name,
+        birthdate,
+        gender,
+        bio,
+        role,
+        location,
+        verification_status
+      `)
+      .eq("user_id", id)
+      .eq("role", "athlete")
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ message: "Athlete not found" });
+    }
+
+    const { data: detail, error: detailsError } = await supabase
+      .from("user_details")
+      .select("height_cm, weight_kg, position, jersey_number, video_url,contact_num,email")
+      .eq("user_id", id)
+      .single();
+
+    if (detailsError && detailsError.code !== "PGRST116") throw detailsError;
+
+    const { data: achievements, error: achError } = await supabase
+      .from("achievements")
+      .select("achievement_id, title, year, description")
+      .eq("user_id", id)
+      .order("created_at", { ascending: true });
+
+    if (achError) throw achError;
+    
+    const age =
+      user.birthdate
+        ? new Date().getFullYear() - new Date(user.birthdate).getFullYear()
+        : "N/A";
+
+    const athlete = 
+    {
+      id: user.user_id,
+      name: user.fullname,
+      sport: user.sport_name || "N/A",
+      position: detail?.position || "N/A",
+      age,
+      gender: user.gender || "N/A",
+      location: user.location || "N/A",
+      bio: user.bio || "",
+      verification_status: user.verification_status,
+      height: detail?.height_cm ?? null,
+      weight: detail?.weight_kg ?? null,
+      jerseyNumber: detail?.jersey_number ?? null,
+      email: detail?.email ?? null,
+      contactNum: detail?.contact_num ?? null,
+      videos: detail?.video_url ? [{ url: detail.video_url }] : [],
+      achievements: achievements || [],
+    };
+
+
+    res.json(athlete);
+  } catch (err) {
+    console.error("Error fetching athlete:", err);
+    res.status(500).json({ error: "Failed to load athlete" });
   }
 });
 
