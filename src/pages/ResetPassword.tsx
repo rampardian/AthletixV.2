@@ -6,16 +6,46 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { toast } from "sonner";
-import { ArrowLeft, Import } from "lucide-react";
-import {validatePassword} from "@/utilities/utils";
-import { Eye, EyeOff } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, CheckCircle2, XCircle } from "lucide-react";
+import {validatePassword, cn} from "@/utilities/utils";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isReset, setIsReset] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordCriteria, setPasswordCriteria] = useState({
+    minLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumber: false,
+    hasSpecialChar: false,
+  });
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean | null>(null);
 
+
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newPassword = e.target.value;
+    const { criteria } = validatePassword(newPassword);
+    setPasswordCriteria(criteria);
+    setPassword(newPassword);
+    // Check if passwords match when password changes
+    if (confirmPassword) {
+      setPasswordsMatch(newPassword === confirmPassword);
+    }
+  };
+
+  const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newConfirmPassword = e.target.value;
+    setConfirmPassword(newConfirmPassword);
+    // Check if passwords match
+    if (newConfirmPassword) {
+      setPasswordsMatch(password === newConfirmPassword);
+    } else {
+      setPasswordsMatch(null);
+    }
+  };
 
   const handleReset = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -25,14 +55,10 @@ const ResetPassword = () => {
       return;
     }
 
-    const { isValid, criteria } = validatePassword(password);
+    const { isValid } = validatePassword(password);
     if (!isValid) {
-        const failedCriteria = Object.entries(criteria)
-        .filter(([_, passed]) => !passed)
-        .map(([key]) => key)
-        .join(", ");
-        toast.error(`Password must meet: ${failedCriteria}`);
-        return;
+      toast.error("Password does not meet requirements");
+      return;
     }
 
     const { error } = await supabase.auth.updateUser({ password });
@@ -92,38 +118,117 @@ const ResetPassword = () => {
           <CardContent>
             <form onSubmit={handleReset} className="space-y-4">
               <div className="space-y-2">
+                <Label htmlFor="password">New Password</Label>
                 <div className="relative">
-                    <Label htmlFor="password">New Password</Label>
-                    <Input
-                        id="password"
-                        type={showPassword ? "text" : "password"}
-                        placeholder="••••••••"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="pr-10"
-                    />
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
-                        onClick={() => setShowPassword(!showPassword)}
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    required
+                    className={cn(
+                      "pr-10",
+                      password && !passwordCriteria.minLength && !passwordCriteria.hasUppercase && !passwordCriteria.hasLowercase && !passwordCriteria.hasNumber && !passwordCriteria.hasSpecialChar && "border-red-500"
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {password && (
+                  <div className="text-sm mt-1 space-y-1">
+                    <p
+                      className={cn(
+                        "font-medium",
+                        passwordCriteria.minLength &&
+                        passwordCriteria.hasUppercase &&
+                        passwordCriteria.hasLowercase &&
+                        passwordCriteria.hasNumber &&
+                        passwordCriteria.hasSpecialChar
+                          ? "text-green-600"
+                          : "text-red-600"
+                      )}
                     >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                    </div>
+                      {passwordCriteria.minLength &&
+                      passwordCriteria.hasUppercase &&
+                      passwordCriteria.hasLowercase &&
+                      passwordCriteria.hasNumber &&
+                      passwordCriteria.hasSpecialChar
+                        ? "✓ Strong password"
+                        : "Password must include:"}
+                    </p>
+                    {!(passwordCriteria.minLength &&
+                      passwordCriteria.hasUppercase &&
+                      passwordCriteria.hasLowercase &&
+                      passwordCriteria.hasNumber &&
+                      passwordCriteria.hasSpecialChar) && (
+                      <ul className="text-xs text-gray-600 space-y-0.5 ml-4">
+                        <li className={cn(passwordCriteria.minLength ? "text-green-600" : "text-red-600")}>
+                          {passwordCriteria.minLength ? "✓" : "✗"} At least 8 characters
+                        </li>
+                        <li className={cn(passwordCriteria.hasUppercase ? "text-green-600" : "text-red-600")}>
+                          {passwordCriteria.hasUppercase ? "✓" : "✗"} One uppercase letter
+                        </li>
+                        <li className={cn(passwordCriteria.hasLowercase ? "text-green-600" : "text-red-600")}>
+                          {passwordCriteria.hasLowercase ? "✓" : "✗"} One lowercase letter
+                        </li>
+                        <li className={cn(passwordCriteria.hasNumber ? "text-green-600" : "text-red-600")}>
+                          {passwordCriteria.hasNumber ? "✓" : "✗"} One number
+                        </li>
+                        <li className={cn(passwordCriteria.hasSpecialChar ? "text-green-600" : "text-red-600")}>
+                          {passwordCriteria.hasSpecialChar ? "✓" : "✗"} One special character
+                        </li>
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
-                />
+                <div className="relative">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={handleConfirmPasswordChange}
+                    required
+                    className={cn(
+                      "pr-10",
+                      passwordsMatch === false && "border-red-500",
+                      passwordsMatch === true && "border-green-500"
+                    )}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+                {confirmPassword && passwordsMatch !== null && (
+                  <div className="flex items-center gap-2 text-sm mt-1">
+                    {passwordsMatch ? (
+                      <>
+                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                        <span className="text-green-600 font-medium">Passwords match</span>
+                      </>
+                    ) : (
+                      <>
+                        <XCircle className="h-4 w-4 text-red-600" />
+                        <span className="text-red-600 font-medium">Passwords do not match</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <Button type="submit" className="w-full">
