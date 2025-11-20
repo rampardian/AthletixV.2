@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useEffect } from "react";
 import { 
   Calendar, 
   MapPin, 
@@ -26,55 +25,50 @@ import {
 import { format } from "date-fns";
 
 
-// Mock event data - in production, this would come from an API
-const mockEventData = {
-  id: "1",
-  title: "Summer Track Championships 2024",
-  organizer: "National Athletics Federation",
-  sport: "Athletics",
-  type: "championship",
-  description: "The premier track and field championship featuring the nation's top athletes competing in various events including sprints, distance running, jumping, and throwing events.",
-  date: new Date("2024-07-15"),
-  endDate: new Date("2024-07-17"),
-  location: "Olympic Stadium, Los Angeles",
-  participants: 250,
-  maxParticipants: 300,
-  status: "upcoming",
-  registrationDeadline: new Date("2024-06-30"),
-  entryFee: 150,
-  categories: ["100m Sprint", "200m Sprint", "400m", "800m", "1500m", "Long Jump", "High Jump", "Shot Put"],
-  schedule: [
-    { day: "Day 1", date: "July 15", events: ["Opening Ceremony", "100m Heats", "Long Jump Qualifying"] },
-    { day: "Day 2", date: "July 16", events: ["200m Heats", "High Jump Final", "Shot Put Final"] },
-    { day: "Day 3", date: "July 17", events: ["All Finals", "Closing Ceremony", "Awards"] }
-  ],
-  prizes: ["Gold Medal + $5000", "Silver Medal + $3000", "Bronze Medal + $1000"],
-  rules: [
-    "All participants must be registered with their national federation",
-    "Anti-doping rules apply",
-    "Athletes must check in 1 hour before their event",
-    "Official competition attire required"
-  ],
-  sponsors: ["Nike", "Gatorade", "Olympic Committee"],
-  contactEmail: "info@nationalathletics.org",
-  contactPhone: "+1 555-0123",
-  website: "www.summerchampionships2024.com",
-  coverImage: "/placeholder.svg",
-  gallery: ["/placeholder.svg", "/placeholder.svg", "/placeholder.svg"],
-  registeredAthletes: [
-    { id: "1", name: "John Smith", avatar: "/placeholder.svg", events: ["100m", "200m"] },
-    { id: "2", name: "Sarah Johnson", avatar: "/placeholder.svg", events: ["Long Jump", "100m"] },
-    { id: "3", name: "Mike Williams", avatar: "/placeholder.svg", events: ["Shot Put"] }
-  ]
-};
+
 
 export default function EventDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   
+  const [event, setEvent] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+  const loadEvent = async () => {
+    const res = await fetch(`http://localhost:5000/api/events/${id}`);
+    const data = await res.json();
+
+    const mappedEvent = {
+      ...data,
+      date: data.start_datetime ? new Date(data.start_datetime) : null,
+      endDate: data.end_datetime ? new Date(data.end_datetime) : null,
+      sport: data.sport_name,
+      event_id: data.event_id,
+      categories: ["5K Run", "Relay"],  // mock categories
+      prizes: ["Gold Medal", "Silver Medal", "Bronze Medal"],  // mock prizes
+      rules: ["Rule 1: Follow instructions", "Rule 2: No cheating"],  // mock rules
+      coverImage: data.coverImage || "https://via.placeholder.com/800x400",
+      organizer: data.organizer || "Organizer Name",
+      contactEmail: data.contactEmail || "email@example.com",
+      contactPhone: data.contactPhone || "123-456-7890",
+      website: data.website || "https://example.com",
+      sponsors: ["Sponsor A", "Sponsor B"], 
+      participants: data.participants || 0,
+      maxParticipants: data.maxParticipants || 100,
+    };
+
+    setEvent(mappedEvent); // <--- use mappedEvent here
+    setLoading(false);
+  };
+
+  loadEvent();
+}, [id]);
+
+
+  if (loading) return <p className="p-6">Loading...</p>;
+  if (!event) return <p className="p-6">Event not found.</p>;
   
-  // In production, fetch event data based on id
-  const event = mockEventData;
 
   const getStatusColor = (status: string) => {
     switch (status) {

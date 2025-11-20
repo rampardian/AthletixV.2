@@ -10,7 +10,7 @@ import athletesRouter from "./routes/athletes.js";
 import settingsRouter from "./routes/settings.js";
 import updatePasswordRoute from "./routes/updatePassword.js";
 import forgotPasswordRouter from "./routes/forgotPassword.js";
-
+import eventsRouter from "./routes/eventDetails.js";
 
 const app = express();
 
@@ -28,6 +28,7 @@ app.use("/api/athletes", athletesRouter);
 app.use("/api/settings", settingsRouter);
 app.use("/api/update-password", updatePasswordRoute);
 app.use("/forgot-password", forgotPasswordRouter);
+app.use("/api/events", eventsRouter);
 
 // Start server
 app.listen(5000, () => console.log("Backend running on http://localhost:5000"));

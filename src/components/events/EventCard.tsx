@@ -23,7 +23,6 @@ const EventCard = ({
   sport,
   date,
   location,
-  organizer,
   description,
   status,
 }: EventCardProps) => {
@@ -53,7 +52,7 @@ const EventCard = ({
         </div>
         <CardTitle className="text-xl">{title}</CardTitle>
         <p className="text-sm text-muted-foreground">
-          Organized by {organizer} • {sport}
+           {sport}
         </p>
       </CardHeader>
       
