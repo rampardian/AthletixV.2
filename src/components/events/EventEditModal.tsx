@@ -94,19 +94,20 @@ export default function EventEditModal({ open, onClose, event, onEventUpdated }:
       const startDatetime = `${formatDateLocal(values.startDate)}T${values.startTime}:00`;
       const endDatetime = `${formatDateLocal(values.endDate)}T${values.endTime}:00`;
 
-      const response = await fetch(`http://localhost:5000/events/${event.event_id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: values.title,
-          type: values.type.toLowerCase(),
-          sport_name: values.sport,
-          start_datetime: startDatetime,
-          end_datetime: endDatetime,
-          location: values.location,
-          description: values.description,
+      const response = await fetch(`http://localhost:5000/api/edit-event/${event.event_id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+            title: values.title,
+            type: values.type.toLowerCase(),
+            sport_name: values.sport,
+            start_datetime: startDatetime,
+            end_datetime: endDatetime,
+            location: values.location,
+            description: values.description,
         }),
-      });
+        });
+
 
       const result = await response.json();
       if (!response.ok) throw new Error(result.message || "Failed to update event");

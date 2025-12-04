@@ -43,6 +43,7 @@ const UserProfile = () => {
 
   const [editEvent, setEditEvent] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [achievements, setAchievements] = useState<any[]>([]);
 
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +54,7 @@ const UserProfile = () => {
         const res = await fetch(`http://localhost:5000/api/organizers/${id}`);
         const data = await res.json();
         setUser(data);
+        setAchievements(data.achievements || []);
       } catch (err) {
         console.error("Failed to fetch user:", err);
       } finally {
@@ -210,8 +212,20 @@ const UserProfile = () => {
             </div>
           </TabsContent>
 
-          <TabsContent value="achievements">
-            <p>N/A</p>
+          <TabsContent value="achievements" className="space-y-4">
+            {achievements.length > 0 ? (
+              achievements.map((ach) => (
+                <Card key={ach.achievement_id}>
+                  <CardContent className="p-4">
+                    <h3 className="font-semibold text-lg">{ach.title}</h3>
+                    <p className="text-muted-foreground">{ach.description || "No description"}</p>
+                    {ach.year && <Badge variant="secondary">{ach.year}</Badge>}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <p>No achievements available.</p>
+            )}
           </TabsContent>
         </Tabs>
 

@@ -14,7 +14,7 @@ import eventsRouter from "./routes/eventDetails.js";
 import userProfileRouter from "./routes/userProfile.js";
 import searchRouter from "./routes/search.js";
 import athleteStatsRouter from "./routes/athleteStats.js";
-
+import editEvent from "./routes/editEvent.js";
 const app = express();
 
 app.use(cors());
@@ -35,7 +35,7 @@ app.use("/api/events", eventsRouter);
 app.use("/api/organizers", userProfileRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/athlete-stats", athleteStatsRouter);
-
+app.use("/api/edit-event", editEvent);
 
 //server port
 app.listen(5000, () => console.log("Backend running on http://localhost:5000"));
