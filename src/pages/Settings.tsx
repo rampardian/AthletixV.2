@@ -44,6 +44,7 @@ import {
   Ruler,
   Weight,
   Hash,
+  BookOpen,
 } from "lucide-react";
 
 interface FormData {
@@ -421,124 +422,170 @@ const handleAvatarUpload = async (file: File) => {
             <TabsTrigger value="security">Security</TabsTrigger>
           </TabsList>
 
-          {/* ACCOUNT TAB */}
           <TabsContent value="account">
-            <Card className="mb-2">
-              <CardHeader>
-                <CardTitle>Account Details</CardTitle>
-                <CardDescription>Update your account information</CardDescription>
-              </CardHeader>
-           <CardContent>
-                <div className="flex justify-end mb-6">
-                  <AvatarUpload
-                    currentAvatarUrl={formData.avatarUrl}
-                    initials={
-                      formData.fullname
-                        ? formData.fullname.split(" ").map((n) => n[0]).join("").toUpperCase()
-                        : ""
-                    }
-                    onAvatarChange={handleAvatarUpload}
-                    uploading={avatarUploading}
+  {/* Card Container for Account Details */}
+  <Card className="mb-2">
+    <CardHeader>
+      <CardTitle className="text-2xl font-bold">Account Details</CardTitle>
+      <CardDescription>Update your personal and professional profile information.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      {/* 1. Avatar Upload (Remains on top right) */}
+      <div className="flex justify-end mb-8">
+        <AvatarUpload
+          currentAvatarUrl={formData.avatarUrl}
+          initials={
+            formData.fullname
+              ? formData.fullname.split(" ").map((n) => n[0]).join("").toUpperCase()
+              : ""
+          }
+          onAvatarChange={handleAvatarUpload}
+          uploading={avatarUploading}
+        />
+      </div>
+
+      <div className="space-y-8">
+        {/* --- SECTION 1: Personal Contact Information --- */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+            <User className="inline-block mr-2 h-5 w-5" /> Personal Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+            {/* Full Name */}
+            <div className="space-y-2">
+              <Label htmlFor="fullname">Full Name</Label>
+              <Input id="fullname" name="fullname" value={formData.fullname} onChange={handleInputChange} />
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email Address</Label>
+              <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
+            </div>
+            
+            {/* Phone */}
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone</Label>
+              <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
+            </div>
+
+            {/* Birthday */}
+            <div className="space-y-2">
+              <Label>Birthday</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn("w-full justify-start text-left font-normal", !formData.birthdate && "text-muted-foreground")}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.birthdate ? format(new Date(formData.birthdate), "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={formData.birthdate ? new Date(formData.birthdate) : undefined}
+                    onSelect={handleDateChange}
+                    initialFocus
                   />
-                </div>
-                
-                <div className="space-y-4">
-                  <Label htmlFor="fullname">
-                    <User className="inline-block mr-2 h-4 w-4" /> Full Name
-                  </Label>
-                  <Input id="fullname" name="fullname" value={formData.fullname} onChange={handleInputChange} />
-                  <Separator />
-                  <Label htmlFor="email">
-                    <Mail className="inline-block mr-2 h-4 w-4" /> Email
-                  </Label>
-                  <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
-                  <Separator />
-                  <Label htmlFor="phone">
-                    <Phone className="inline-block mr-2 h-4 w-4" /> Phone
-                  </Label>
-                  <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
-                  <Separator />
-                  <Label htmlFor="region">
-                    <MapPin className="inline-block mr-2 h-4 w-4" /> Region
-                  </Label>
-                  <Select value={formData.location} onValueChange={(value) => handleSelectChange("location", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select your region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {regions.map((region) => (
-                        <SelectItem key={region} value={region}>
-                          {region}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Separator />
-                  <Label htmlFor="position">Position</Label>
-                  <Input id="position" name="position" value={formData.position} onChange={handleInputChange} />
-                  <Separator />
-                  <div className="grid grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="height">
-                        <Ruler className="inline-block mr-2 h-4 w-4" /> Height (cm)
-                      </Label>
-                      <Input id="height" name="height" value={formData.height} onChange={handleInputChange} />
-                    </div>
-                    <div>
-                      <Label htmlFor="weight">
-                        <Weight className="inline-block mr-2 h-4 w-4" /> Weight (kg)
-                      </Label>
-                      <Input id="weight" name="weight" value={formData.weight} onChange={handleInputChange} />
-                    </div>
-                    <div>
-                      <Label htmlFor="jerseyNumber">
-                        <Hash className="inline-block mr-2 h-4 w-4" /> Jersey Number
-                      </Label>
-                      <Input
-                        id="jerseyNumber"
-                        name="jerseyNumber"
-                        value={formData.jerseyNumber}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                  </div>
-                  <Separator />
-                  <Label>
-                    <CalendarIcon className="inline-block mr-2 h-4 w-4" /> Birthday
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn("w-full justify-start text-left font-normal", !formData.birthdate && "text-muted-foreground")}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.birthdate ? format(new Date(formData.birthdate), "PPP") : "Pick a date"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.birthdate ? new Date(formData.birthdate) : undefined}
-                        onSelect={handleDateChange}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <div> 
-                      <Label htmlFor="bio">Bio</Label>
-                      <div>
-                        <textarea
-                          id="bio"
-                          name="bio"
-                          className="w-full h-40 border rounded-md p-2 text-sm"
-                          rows={4}
-                          value={formData.bio}
-                          onChange={handleInputChange}
-                        />
-                    </div>
-                </div>
-                </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+        </div>
+        
+        <Separator />
+
+        {/* --- SECTION 2: Professional / Athletic Details --- */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+            <Trophy className="inline-block mr-2 h-5 w-5" /> Athletic Details
+          </h3>
+          
+          <div className="space-y-4">
+            {/* Region and Position (Two-column layout) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+              {/* Region */}
+              <div className="space-y-2">
+                <Label htmlFor="region">Region</Label>
+                <Select value={formData.location} onValueChange={(value) => handleSelectChange("location", value)}>
+                  <SelectTrigger>
+                    <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                    <SelectValue placeholder="Select your region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {regions.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Position */}
+              <div className="space-y-2">
+                <Label htmlFor="position">Position / Role</Label>
+                <Input id="position" name="position" value={formData.position} onChange={handleInputChange} />
+              </div>
+            </div>
+
+            {/* Physical Stats (Three-column layout) */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              {/* Height */}
+              <div className="space-y-2">
+                <Label htmlFor="height">
+                  <Ruler className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Height (cm)
+                </Label>
+                <Input id="height" name="height" type="number" value={formData.height} onChange={handleInputChange} />
+              </div>
+              
+              {/* Weight */}
+              <div className="space-y-2">
+                <Label htmlFor="weight">
+                  <Weight className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Weight (kg)
+                </Label>
+                <Input id="weight" name="weight" type="number" value={formData.weight} onChange={handleInputChange} />
+              </div>
+              
+              {/* Jersey Number */}
+              <div className="space-y-2">
+                <Label htmlFor="jerseyNumber">
+                  <Hash className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Jersey #
+                </Label>
+                <Input
+                  id="jerseyNumber"
+                  name="jerseyNumber"
+                  type="number"
+                  value={formData.jerseyNumber}
+                  onChange={handleInputChange}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <Separator />
+
+        {/* --- SECTION 3: Biography --- */}
+        <div>
+          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+            <BookOpen className="inline-block mr-2 h-5 w-5" /> Biography
+          </h3>
+          <div className="space-y-2">
+            <Label htmlFor="bio">Bio / Achievements (Optional)</Label>
+            <textarea
+              id="bio"
+              name="bio"
+              className="w-full h-40 border rounded-md p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-200"
+              rows={4}
+              value={formData.bio}
+              onChange={handleInputChange}
+            />
+          </div>
+        </div>
+      </div>
                 {/* Video Highlight Section */}
                 <Card className="mt-4">
                   <CardHeader>

@@ -51,7 +51,6 @@ const formSchema = z.object({
   endDate: z.date({ required_error: "End date is required" }),
   endTime: z.string().min(1, "End time is required"),
   location: z.string().min(3, "Location is required."),
-  entryFee: z.coerce.number().nonnegative("Entry fee must be positive."),
   description: z.string().min(10, "Description must be at least 10 characters."),
   }).refine((data) => {
   const start = new Date(`${data.startDate.toDateString()} ${data.startTime}`);
@@ -86,7 +85,6 @@ const formSchema = z.object({
   endDate: undefined,
   endTime: "",
   location: "",
-  entryFee: 0,
   description: "",
   },
   });
@@ -114,7 +112,6 @@ const formSchema = z.object({
         start_datetime: startDatetime,
         end_datetime: endDatetime,
         location: values.location,
-        entry_fee: values.entryFee,
         description: values.description,
       }),
     });
@@ -367,24 +364,6 @@ const formSchema = z.object({
                     <FormLabel>End Time</FormLabel>
                     <FormControl>
                       <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-
-            {/* Entry Fee & Participants */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="entryFee"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Entry Fee ($)</FormLabel>
-                    <FormControl>
-                      <Input type="number" min={0} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

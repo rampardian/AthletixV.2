@@ -1,0 +1,340 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar } from "@/components/ui/calendar";
+import { CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/utilities/utils";
+import { useToast } from "@/hooks/use-toast";
+import { useSports } from "@/hooks/useSports";
+
+const formSchema = z.object({
+  title: z.string().min(3),
+  type: z.enum([
+    "Competition",
+    "Tryout",
+    "Camp",
+    "Showcase",
+    "Clinic",
+    "Tournament",
+    "Seminar",
+    "Other",
+  ]),
+  sport: z.string().min(1),
+  startDate: z.date(),
+  startTime: z.string(),
+  endDate: z.date(),
+  endTime: z.string(),
+  location: z.string().min(3),
+  description: z.string().min(10),
+}).refine((data) => {
+  const start = new Date(`${data.startDate.toDateString()} ${data.startTime}`);
+  const end = new Date(`${data.endDate.toDateString()} ${data.endTime}`);
+  return end > start;
+}, {
+  message: "End date/time must be after start date/time",
+  path: ["endDate"],
+});
+
+interface EventEditModalProps {
+  open: boolean;
+  onClose: () => void;
+  event: any;
+  onEventUpdated: (updatedEvent: any) => void;
+}
+
+export default function EventEditModal({ open, onClose, event, onEventUpdated }: EventEditModalProps) {
+  const { toast } = useToast();
+  const { sports, loading: sportsLoading, error: sportsError } = useSports();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      title: event.title,
+      type: event.type.charAt(0).toUpperCase() + event.type.slice(1),
+      sport: event.sport_name,
+      startDate: new Date(event.start_datetime),
+      startTime: format(new Date(event.start_datetime), "HH:mm"),
+      endDate: new Date(event.end_datetime),
+      endTime: format(new Date(event.end_datetime), "HH:mm"),
+      location: event.location,
+      description: event.description,
+    },
+  });
+
+  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    setIsSubmitting(true);
+    try {
+      const formatDateLocal = (date: Date) =>
+        `${date.getFullYear()}-${(date.getMonth() + 1)
+          .toString()
+          .padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")}`;
+
+      const startDatetime = `${formatDateLocal(values.startDate)}T${values.startTime}:00`;
+      const endDatetime = `${formatDateLocal(values.endDate)}T${values.endTime}:00`;
+
+      const response = await fetch(`http://localhost:5000/api/edit-event/${event.event_id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+            title: values.title,
+            type: values.type.toLowerCase(),
+            sport_name: values.sport,
+            start_datetime: startDatetime,
+            end_datetime: endDatetime,
+            location: values.location,
+            description: values.description,
+        }),
+        });
+
+
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.message || "Failed to update event");
+
+      onEventUpdated(result);
+      onClose();
+      toast({ title: "Event Updated!", description: "Your event has been updated." });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Event</DialogTitle>
+        </DialogHeader>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Event Title */}
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Title</FormLabel>
+                    <FormControl><Input {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Event Type */}
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Event Type</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {["Competition","Tryout","Camp","Showcase","Clinic","Tournament","Seminar","Other"].map((t) => (
+                          <SelectItem key={t} value={t}>{t}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Sport */}
+            <FormField
+              control={form.control}
+              name="sport"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Sport</FormLabel>
+                  {sportsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading sports...</p>
+                  ) : sportsError ? (
+                    <p className="text-sm text-red-500">Failed to load sports</p>
+                  ) : (
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a sport" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {sports.map((s: any) => (
+                          <SelectItem key={s.sport_id} value={s.sport_name}>
+                            {s.sport_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Location */}
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Location</FormLabel>
+                  <FormControl><Input {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Start Date */}
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn("w-full text-left", !field.value && "text-muted-foreground")}
+                          >
+                            {field.value ? format(field.value, "PPP") : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date()}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Start Time */}
+              <FormField
+                control={form.control}
+                name="startTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Time</FormLabel>
+                    <FormControl><Input type="time" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* End Date */}
+              <FormField
+                control={form.control}
+                name="endDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn("w-full text-left", !field.value && "text-muted-foreground")}
+                          >
+                            {field.value ? format(field.value, "PPP") : "Pick a date"}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) => date < new Date(form.getValues("startDate"))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* End Time */}
+              <FormField
+                control={form.control}
+                name="endTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>End Time</FormLabel>
+                    <FormControl><Input type="time" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Description */}
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl><Textarea {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex gap-3">
+              <Button type="button" variant="outline" onClick={onClose} className="flex-1">Cancel</Button>
+              <Button type="submit" className="flex-1" disabled={isSubmitting || sportsLoading}>
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

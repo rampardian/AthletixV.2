@@ -4,13 +4,8 @@ import { supabase } from "../supabaseClient.js";
 
 const router = express.Router();
 
-router.get("/test", (req, res) => {
-  res.send("✅ Settings route works!");
-});
-
 router.get("/:userId", async (req, res) => {
   const { userId } = req.params;
-  console.log("📡 Received request for userId:", userId);
   const token = req.headers.authorization?.split(" ")[1];
  
   
