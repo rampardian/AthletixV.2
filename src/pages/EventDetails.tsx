@@ -186,29 +186,7 @@
                       </div>
                     </CardContent>
                   </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Prizes & Awards</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        {event.prizes.map((prize, index) => (
-                          <div key={index} className="flex items-center gap-3">
-                            <Medal className={`h-5 w-5 ${
-                              index === 0 ? 'text-yellow-500' : 
-                              index === 1 ? 'text-gray-400' : 
-                              'text-orange-600'
-                            }`} />
-                            <span>{prize}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
                 </TabsContent>
-                
                 
                 <TabsContent value="rules">
                   <Card>
