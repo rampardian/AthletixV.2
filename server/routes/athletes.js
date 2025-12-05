@@ -114,7 +114,10 @@ router.get("/:id", async (req, res) => {
       .eq("user_id", id)
       .single();
 
-    if (detailsError && detailsError.code !== "PGRST116") throw detailsError;
+    if (detailsError && detailsError.code !== "PGRST116") {
+      console.error("Details error:", detailsError);
+      // Don't throw - just set detail to null
+    }
 
     const { data: achievements, error: achError } = await supabase
       .from("achievements")
@@ -122,7 +125,9 @@ router.get("/:id", async (req, res) => {
       .eq("user_id", id)
       .order("created_at", { ascending: true });
 
-    if (achError) throw achError;
+    if (achError) {
+      console.error("Achievements error:", achError);
+    }
 
     const { data: education, error: eduError } = await supabase
       .from("education")
@@ -130,32 +135,33 @@ router.get("/:id", async (req, res) => {
       .eq("user_id", id)
       .order("end_year", { ascending: false });
 
-    if (eduError) throw eduError;
+    if (eduError) {
+      console.error("Education error:", eduError);
+    }
 
-    // Fetch detailed stats for this athlete (from "athlete_stats" table)
     const { data: statsRow, error: statsError } = await supabase
       .from("athlete_stats")
       .select("ppg, rpg, apg")
       .eq("user_id", id)
       .single();
 
-    if (statsError && statsError.code !== "PGRST116") throw statsError;
+    if (statsError && statsError.code !== "PGRST116") {
+      console.error("Stats error:", statsError);
+    }
 
     const ppg = statsRow?.ppg ?? 0;
     const rpg = statsRow?.rpg ?? 0;
     const apg = statsRow?.apg ?? 0;
-    
-    const age =
-      user.birthdate
-        ? new Date().getFullYear() - new Date(user.birthdate).getFullYear()
-        : "N/A";
+   
+    const age = user.birthdate
+      ? new Date().getFullYear() - new Date(user.birthdate).getFullYear()
+      : "N/A";
 
-    const athlete = 
-    {
+    const athlete = {
       id: user.user_id,
       name: user.fullname,
       sport: user.sport_name || "N/A",
-      position: detail?.position,
+      position: detail?.position || "N/A",
       age,
       gender: user.gender || "N/A",
       location: user.location || "N/A",
@@ -165,7 +171,7 @@ router.get("/:id", async (req, res) => {
       weight: detail?.weight_kg ?? null,
       jerseyNumber: detail?.jersey_number ?? null,
       email: detail?.email ?? null,
-      imageUrl: detail?.avatar_url ?? null,
+      imageUrl: detail?.avatar_url ?? null, // ✅ ADD THIS LINE
       contactNum: detail?.contact_num ?? null,
       videos: detail?.video_url ? [{ url: detail.video_url }] : [],
       achievements: achievements || [],
@@ -183,7 +189,6 @@ router.get("/:id", async (req, res) => {
         ],
       },
     };
-
 
     res.json(athlete);
   } catch (err) {

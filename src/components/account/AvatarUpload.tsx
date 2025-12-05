@@ -86,42 +86,42 @@ const AvatarUpload = ({ currentAvatarUrl, initials, onAvatarChange, uploading }:
     }
   };
 
-  return (
-    <>
-      <div className="relative group">
-        <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
-          {uploading ? (
-            <div className="flex items-center justify-center h-full w-full bg-muted">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : (
-            <>
-              <AvatarImage src={currentAvatarUrl} alt="Profile" />
-              <AvatarFallback className="bg-primary text-primary-foreground text-3xl font-bold">
-                {initials}
-              </AvatarFallback>
-            </>
-          )}
-        </Avatar>
-        
-        <label
-          htmlFor="avatar-upload"
-          className={`absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
-            uploading ? "pointer-events-none" : ""
-          }`}
-        >
-          <Camera className="h-8 w-8 text-white" />
-        </label>
-        
-        <input
-          id="avatar-upload"
-          type="file"
-          accept="image/jpeg,image/jpg,image/png,image/webp"
-          onChange={onFileChange}
-          disabled={uploading}
-          className="hidden"
-        />
-      </div>
+return (
+  <>
+    <div className="relative group">
+      <Avatar className="h-44 w-44 border-4 border-background shadow-lg">
+        {uploading ? (
+          <div className="flex items-center justify-center h-full w-full bg-muted">
+            <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <>
+            <AvatarImage src={currentAvatarUrl} alt="Profile" />
+            <AvatarFallback className="bg-primary text-primary-foreground text-4xl font-bold">
+              {initials}
+            </AvatarFallback>
+          </>
+        )}
+      </Avatar>
+     
+      <label
+        htmlFor="avatar-upload"
+        className={`absolute inset-0 flex items-center justify-center bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+          uploading ? "pointer-events-none" : ""
+        }`}
+      >
+        <Camera className="h-10 w-10 text-white" />
+      </label>
+     
+      <input
+        id="avatar-upload"
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        onChange={onFileChange}
+        disabled={uploading}
+        className="hidden"
+      />
+    </div>
 
       <Dialog open={isDialogOpen} onOpenChange={handleDialogClose}>
         <DialogContent className="sm:max-w-md">

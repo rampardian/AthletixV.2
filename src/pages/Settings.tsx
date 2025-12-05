@@ -20,8 +20,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { convertToEmbed } from "@/utilities/utils";
 import AvatarUpload from "@/components/account/AvatarUpload";
 import { supabase } from "@/supabaseClient";
-
-
 import {
   User,
   Mail,
@@ -81,7 +79,6 @@ interface Education {
   endYear: string;
 }
 
-
 const regions = [
   "NCR",
   "Region I",
@@ -104,8 +101,7 @@ const regions = [
 
 const Settings = () => {
   const navigate = useNavigate();
-  const { session, user, loading: authLoading, signOut } = useAuth();
-
+  const { session, user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     fullname: "",
@@ -124,60 +120,65 @@ const Settings = () => {
   const [education, setEducation] = useState<Education[]>([]);
   const [showPassword, setShowPassword] = useState(false);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  
+  // Add these new states for avatar preview
+  const [pendingAvatarFile, setPendingAvatarFile] = useState<File | null>(null);
+  const [previewAvatarUrl, setPreviewAvatarUrl] = useState<string>("");
 
   // Fetch data when user is available
   useEffect(() => {
-  const fetchSettings = async () => {
-    if (!session || !user) return;
-    setLoading(true);
+    const fetchSettings = async () => {
+      if (!session || !user) return;
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
+          {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          }
+        );
 
-    try {
-      const response = await axios.get(
-        `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
-        {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        }
-      );
+        const { user: userData, achievements, education } = response.data;
 
-      const { user: userData, achievements, education } = response.data;
+        setFormData({
+          fullname: userData.fullname || "",
+          email: userData.email || "",
+          phone: userData.contact_num || "",
+          location: userData.location || "",
+          position: userData.position || "",
+          height: userData.height_cm?.toString() || "",
+          weight: userData.weight_kg?.toString() || "",
+          jerseyNumber: userData.jersey_number?.toString() || "",
+          birthdate: userData.birthdate || null,
+          bio: userData.bio || "",
+          videoUrl: userData.video_url || "",
+          avatarUrl: userData.avatar_url || "",
+        });
+        
+        // Set initial preview to current avatar
+        setPreviewAvatarUrl(userData.avatar_url || "");
 
-      setFormData({
-        fullname: userData.fullname || "",
-        email: userData.email || "",
-        phone: userData.contact_num || "",
-        location: userData.location || "",
-        position: userData.position || "",
-        height: userData.height_cm?.toString() || "",
-        weight: userData.weight_kg?.toString() || "",
-        jerseyNumber: userData.jersey_number?.toString() || "",
-        birthdate: userData.birthdate || null, 
-        bio: userData.bio || "",
-        videoUrl: userData.video_url || "",
-        avatarUrl: userData.avatar_url || "",
-      });
+        setAchievements(achievements || []);
+        setEducation(
+          (education || []).map((edu: { education_id: string; school: string; degree: string; field: string; start_year: number; end_year: number }) => ({
+            education_id: edu.education_id,
+            school: edu.school || "",
+            degree: edu.degree || "",
+            field: edu.field || "",
+            startYear: edu.start_year?.toString() || "",
+            endYear: edu.end_year?.toString() || "",
+          }))
+        );
+      } catch (error) {
+        console.error("Error fetching settings:", error);
+        toast.error("Failed to fetch settings");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      setAchievements(achievements || []);
-      setEducation(
-  (education || []).map((edu: any) => ({
-    education_id: edu.education_id,
-    school: edu.school || "",
-    degree: edu.degree || "",
-    field: edu.field || "",
-    startYear: edu.start_year?.toString() || "",
-    endYear: edu.end_year?.toString() || "",
-  }))
-);
-
-    } catch (error) {
-      console.error("Error fetching settings:", error);
-      toast.error("Failed to fetch settings");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchSettings();
-}, [session, user]);
+    fetchSettings();
+  }, [session, user]);
 
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -187,113 +188,196 @@ const Settings = () => {
 
   // Handle date change
   const handleDateChange = (date: Date | undefined) => {
-  setFormData((prev) => ({
-    ...prev,
-    birthdate: date ? date.toISOString().split("T")[0] : null,
-  }));
-};
+    setFormData((prev) => ({
+      ...prev,
+      birthdate: date ? date.toISOString().split("T")[0] : null,
+    }));
+  };
 
-  // Handle save changes 
-const handleSave = async () => {
-  if (!session || !user) {
-    toast.error("User not authenticated");
-    return;
-  }
+  // Handle region selection
+  const handleSelectChange = (field: string, value: string) =>
+    setFormData((prev) => ({ ...prev, [field]: value }));
 
-  const embedUrl = convertToEmbed(formData.videoUrl);
+  // Update handleAvatarUpload to only store the file and create preview
+  const handleAvatarChange = async (file: File) => {
+    if (!session || !user) {
+      toast.error("User not authenticated");
+      return;
+    }
 
-  try {
-    await axios.put(
-      `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
-      {
-        user: {
-          fullname: formData.fullname,
-          email: formData.email,
-          contact_num: formData.phone,
-          location: formData.location,
-          position: formData.position,
-          height: parseFloat(formData.height) || null,
-          weight: parseFloat(formData.weight) || null,
-          jersey_number: parseInt(formData.jerseyNumber) || null,
-          birthdate: formData.birthdate,
-          bio: formData.bio,
-          video_url: convertToEmbed(formData.videoUrl ?? null),
-          avatar_url: formData.avatarUrl || null, 
-        },
-        achievements,
-        education,
-      },
-      {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+    setAvatarUploading(true);
+    try {
+      // Store the file for later upload
+      setPendingAvatarFile(file);
+      
+      // Create a preview URL
+      const objectUrl = URL.createObjectURL(file);
+      setPreviewAvatarUrl(objectUrl);
+      
+      toast.success("Avatar ready to upload. Click 'Save Changes' to apply.");
+    } catch (error) {
+      console.error("Error preparing avatar:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to prepare profile picture";
+      toast.error(errorMessage);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // Update handleSave to upload the avatar if there's a pending file
+  const handleSave = async () => {
+    if (!session || !user) {
+      toast.error("User not authenticated");
+      return;
+    }
+
+    setLoading(true);
+    
+    try {
+      let finalAvatarUrl = formData.avatarUrl;
+
+      // Upload avatar if there's a pending file
+      if (pendingAvatarFile) {
+        // Delete old avatar if exists
+        if (formData.avatarUrl) {
+          const oldPath = formData.avatarUrl.split('/').slice(-2).join('/');
+          if (oldPath && !oldPath.includes('default')) {
+            const { error: deleteError } = await supabase.storage
+              .from('user-avatars')
+              .remove([oldPath]);
+            
+            if (deleteError) console.error("Error deleting old avatar:", deleteError);
+          }
+        }
+
+        // Upload new avatar
+        const fileExt = pendingAvatarFile.name.split('.').pop();
+        const fileName = `avatar_${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('user-avatars')
+          .upload(filePath, pendingAvatarFile, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('user-avatars')
+          .getPublicUrl(filePath);
+
+        finalAvatarUrl = publicUrl;
+        
+        // Clean up preview URL
+        if (previewAvatarUrl && previewAvatarUrl.startsWith('blob:')) {
+          URL.revokeObjectURL(previewAvatarUrl);
+        }
       }
-    );
 
-    toast.success("Profile updated successfully!");
-  } catch (error: any) {
-    console.error("Error saving account settings:", error);
-    toast.error(error.response?.data?.message || "Failed to save changes");
-  }
-};
+      const embedUrl = convertToEmbed(formData.videoUrl ?? null);
+
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
+        {
+          user: {
+            fullname: formData.fullname,
+            email: formData.email,
+            contact_num: formData.phone,
+            location: formData.location,
+            position: formData.position,
+            height: parseFloat(formData.height) || null,
+            weight: parseFloat(formData.weight) || null,
+            jersey_number: parseInt(formData.jerseyNumber) || null,
+            birthdate: formData.birthdate,
+            bio: formData.bio,
+            video_url: embedUrl,
+            avatar_url: finalAvatarUrl,
+          },
+          achievements,
+          education,
+        },
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }
+      );
+
+      // Update form data with final avatar URL
+      setFormData(prev => ({ ...prev, avatarUrl: finalAvatarUrl }));
+      setPreviewAvatarUrl(finalAvatarUrl || "");
+      setPendingAvatarFile(null);
+
+      toast.success("Profile updated successfully!");
+    } catch (error) {
+      console.error("Error saving account settings:", error);
+      const errorMessage = error instanceof Error && 'response' in error 
+        ? (error as { response?: { data?: { message?: string } } }).response?.data?.message 
+        : "Failed to save changes";
+      toast.error(errorMessage || "Failed to save changes");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Handle password update
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
+    if (!session || !user) {
+      toast.error("User not authenticated");
+      return;
+    }
 
-  if (!session || !user) {
-    toast.error("User not authenticated");
-    return;
-  }
+    const { currentPassword, newPassword, confirmPassword } = formData;
 
-  const { currentPassword, newPassword, confirmPassword } = formData;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("All password fields are required");
+      return;
+    }
 
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    toast.error("All password fields are required");
-    return;
-  }
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match");
+      return;
+    }
 
-  if (newPassword !== confirmPassword) {
-    toast.error("New passwords do not match");
-    return;
-  }
+    const { isValid, criteria } = validatePassword(newPassword);
+    if (!isValid) {
+      const unmet = Object.entries(criteria)
+        .filter(([, met]) => !met)
+        .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
+      toast.error(`Password must include: ${unmet.join(", ")}`);
+      return;
+    }
 
-  const { isValid, criteria } = validatePassword(newPassword);
-  if (!isValid) {
-    const unmet = Object.entries(criteria)
-      .filter(([_, met]) => !met)
-      .map(([key]) => key.replace(/([A-Z])/g, " $1").toLowerCase());
-    toast.error(`Password must include: ${unmet.join(", ")}`);
-    return;
-  }
+    setLoading(true);
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/update-password`, {
+        email: user.email,
+        currentPassword,
+        newPassword,
+        confirmPassword,
+      });
 
-  setLoading(true);
-
-  try {
-    await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/update-password`, {
-      email: user.email,
-      currentPassword,
-      newPassword,
-      confirmPassword,
-    });
-
-    toast.success("Password updated successfully!");
-
-    setFormData((prev) => ({
-      ...prev,
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    }));
-
-    localStorage.removeItem("supabase.auth.token"); 
-    navigate("/login"); 
-
-  } catch (err: any) {
-    console.error("Backend password update error:", err);
-    toast.error(err.response?.data?.message || "Failed to update password");
-  } finally {
-    setLoading(false);
-  }
-};
+      toast.success("Password updated successfully!");
+      setFormData((prev) => ({
+        ...prev,
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      }));
+      localStorage.removeItem("supabase.auth.token");
+      navigate("/login");
+    } catch (err) {
+      console.error("Backend password update error:", err);
+      const errorMessage = err instanceof Error && 'response' in err 
+        ? (err as { response?: { data?: { message?: string } } }).response?.data?.message 
+        : "Failed to update password";
+      toast.error(errorMessage || "Failed to update password");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Achievements management
   const addAchievement = () =>
@@ -321,10 +405,15 @@ const handleSave = async () => {
   const removeEducation = (index: number) =>
     setEducation(education.filter((_, i) => i !== index));
 
-  // Handle region selection
-  const handleSelectChange = (field: string, value: string) =>
-    setFormData((prev) => ({ ...prev, [field]: value }));
-``
+  // Clean up preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (previewAvatarUrl && previewAvatarUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(previewAvatarUrl);
+      }
+    };
+  }, [previewAvatarUrl]);
+
   // If still loading auth
   if (authLoading || loading) {
     return (
@@ -334,71 +423,6 @@ const handleSave = async () => {
     );
   }
 
-const handleAvatarUpload = async (file: File) => {
-  if (!session || !user) {
-    toast.error("User not authenticated");
-    return;
-  }
-
- setAvatarUploading(true);
-  try {
-    // Delete old avatar if exists
-    if (formData.avatarUrl) {
-      const oldPath = formData.avatarUrl.split('/').slice(-2).join('/'); // Get "userId/filename"
-      if (oldPath && !oldPath.includes('default')) {
-        const { error: deleteError } = await supabase.storage
-          .from('user-avatars')
-          .remove([oldPath]);
-        
-        if (deleteError) console.error("Error deleting old avatar:", deleteError);
-      }
-    }
-
-   // Upload new avatar
-    const fileExt = file.name.split('.').pop();
-    const fileName = `avatar_${Date.now()}.${fileExt}`;
-    const filePath = `${user.id}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('user-avatars')
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (uploadError) throw uploadError;
-
-    // Get public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from('user-avatars')
-      .getPublicUrl(filePath);
-
-    // Update backend via your existing API
-    await axios.put(
-      `${import.meta.env.VITE_BACKEND_URL}/api/settings/${user.id}`,
-      {
-        user: {
-          ...formData,
-          avatar_url: publicUrl,
-        },
-        achievements,
-        education,
-      },
-      {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      }
-    );
-
-    setFormData(prev => ({ ...prev, avatarUrl: publicUrl }));
-    toast.success("Profile picture updated successfully!");
-  } catch (error: any) {
-    console.error("Error uploading avatar:", error);
-    toast.error(error.message || "Failed to upload profile picture");
-  } finally {
-    setAvatarUploading(false);
-  }
-};
-  
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -423,169 +447,176 @@ const handleAvatarUpload = async (file: File) => {
           </TabsList>
 
           <TabsContent value="account">
-  {/* Card Container for Account Details */}
-  <Card className="mb-2">
-    <CardHeader>
-      <CardTitle className="text-2xl font-bold">Account Details</CardTitle>
-      <CardDescription>Update your personal and professional profile information.</CardDescription>
-    </CardHeader>
-    <CardContent>
-      {/* 1. Avatar Upload (Remains on top right) */}
-      <div className="flex justify-end mb-8">
-        <AvatarUpload
-          currentAvatarUrl={formData.avatarUrl}
-          initials={
-            formData.fullname
-              ? formData.fullname.split(" ").map((n) => n[0]).join("").toUpperCase()
-              : ""
-          }
-          onAvatarChange={handleAvatarUpload}
-          uploading={avatarUploading}
-        />
-      </div>
+            {/* Card Container for Account Details */}
+            <Card className="mb-2">
+              <CardHeader>
+                <CardTitle className="text-2xl font-bold">Account Details</CardTitle>
+                <CardDescription>Update your personal and professional profile information.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-8">
+                  {/* ----- SECTION 1: Personal Contact Information with Avatar ----- */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+                      <User className="inline-block mr-2 h-5 w-5" /> Personal Information
+                    </h3>
+                    
+                    {/* Desktop: Two-column layout (Form fields | Avatar) */}
+                    {/* Mobile: Stacked layout (Avatar on top, then form fields) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                      {/* Left side: Form fields (takes 2 columns on desktop) */}
+                      <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 order-2 lg:order-1">
+                        {/* Full Name */}
+                        <div className="space-y-2">
+                          <Label htmlFor="fullname">Full Name</Label>
+                          <Input id="fullname" name="fullname" value={formData.fullname} onChange={handleInputChange} />
+                        </div>
+                        
+                        {/* Email */}
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email Address</Label>
+                          <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
+                        </div>
+                        
+                        {/* Phone */}
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Phone</Label>
+                          <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
+                        </div>
+                        
+                        {/* Birthday */}
+                        <div className="space-y-2">
+                          <Label>Birthday</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className={cn("w-full justify-start text-left font-normal", !formData.birthdate && "text-muted-foreground")}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {formData.birthdate ? format(new Date(formData.birthdate), "PPP") : "Pick a date"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0">
+                              <Calendar
+                                mode="single"
+                                selected={formData.birthdate ? new Date(formData.birthdate) : undefined}
+                                onSelect={handleDateChange}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                      
+                      {/* Right side: Avatar Upload (takes 1 column on desktop) */}
+                      <div className="flex justify-center items-center order-1 lg:order-2 min-h-[300px] lg:min-h-full">
+                        <AvatarUpload
+                          currentAvatarUrl={previewAvatarUrl}
+                          initials={
+                            formData.fullname
+                              ? formData.fullname.split(" ").map((n) => n[0]).join("").toUpperCase()
+                              : ""
+                          }
+                          onAvatarChange={handleAvatarChange}
+                          uploading={avatarUploading}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* ----- SECTION 2: Professional / Athletic Details ----- */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+                      <Trophy className="inline-block mr-2 h-5 w-5" /> Athletic Details
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      {/* Region and Position (Two-column layout) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                        {/* Region */}
+                        <div className="space-y-2">
+                          <Label htmlFor="region">Region</Label>
+                          <Select value={formData.location} onValueChange={(value) => handleSelectChange("location", value)}>
+                            <SelectTrigger>
+                              <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
+                              <SelectValue placeholder="Select your region" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {regions.map((region) => (
+                                <SelectItem key={region} value={region}>
+                                  {region}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {/* Position */}
+                        <div className="space-y-2">
+                          <Label htmlFor="position">Position / Role</Label>
+                          <Input id="position" name="position" value={formData.position} onChange={handleInputChange} />
+                        </div>
+                      </div>
+                      
+                      {/* Physical Stats (Three-column layout) */}
+                      <div className="grid grid-cols-3 gap-4 mt-6">
+                        {/* Height */}
+                        <div className="space-y-2">
+                          <Label htmlFor="height">
+                            <Ruler className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Height (cm)
+                          </Label>
+                          <Input id="height" name="height" type="number" value={formData.height} onChange={handleInputChange} />
+                        </div>
+                        
+                        {/* Weight */}
+                        <div className="space-y-2">
+                          <Label htmlFor="weight">
+                            <Weight className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Weight (kg)
+                          </Label>
+                          <Input id="weight" name="weight" type="number" value={formData.weight} onChange={handleInputChange} />
+                        </div>
+                        
+                        {/* Jersey Number */}
+                        <div className="space-y-2">
+                          <Label htmlFor="jerseyNumber">
+                            <Hash className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Jersey #
+                          </Label>
+                          <Input
+                            id="jerseyNumber"
+                            name="jerseyNumber"
+                            type="number"
+                            value={formData.jerseyNumber}
+                            onChange={handleInputChange}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <Separator />
+                  
+                  {/* ----- SECTION 3: Biography ----- */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
+                      <BookOpen className="inline-block mr-2 h-5 w-5" /> Biography
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="bio">Bio / Achievements (Optional)</Label>
+                      <textarea
+                        id="bio"
+                        name="bio"
+                        className="w-full h-40 border rounded-md p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-200"
+                        rows={4}
+                        value={formData.bio}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                </div>
 
-      <div className="space-y-8">
-        {/* --- SECTION 1: Personal Contact Information --- */}
-        <div>
-          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
-            <User className="inline-block mr-2 h-5 w-5" /> Personal Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-            {/* Full Name */}
-            <div className="space-y-2">
-              <Label htmlFor="fullname">Full Name</Label>
-              <Input id="fullname" name="fullname" value={formData.fullname} onChange={handleInputChange} />
-            </div>
-
-            {/* Email */}
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input id="email" name="email" type="email" value={formData.email} onChange={handleInputChange} />
-            </div>
-            
-            {/* Phone */}
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" name="phone" type="tel" value={formData.phone} onChange={handleInputChange} />
-            </div>
-
-            {/* Birthday */}
-            <div className="space-y-2">
-              <Label>Birthday</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn("w-full justify-start text-left font-normal", !formData.birthdate && "text-muted-foreground")}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {formData.birthdate ? format(new Date(formData.birthdate), "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={formData.birthdate ? new Date(formData.birthdate) : undefined}
-                    onSelect={handleDateChange}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-        </div>
-        
-        <Separator />
-
-        {/* --- SECTION 2: Professional / Athletic Details --- */}
-        <div>
-          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
-            <Trophy className="inline-block mr-2 h-5 w-5" /> Athletic Details
-          </h3>
-          
-          <div className="space-y-4">
-            {/* Region and Position (Two-column layout) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-              {/* Region */}
-              <div className="space-y-2">
-                <Label htmlFor="region">Region</Label>
-                <Select value={formData.location} onValueChange={(value) => handleSelectChange("location", value)}>
-                  <SelectTrigger>
-                    <MapPin className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <SelectValue placeholder="Select your region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {regions.map((region) => (
-                      <SelectItem key={region} value={region}>
-                        {region}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Position */}
-              <div className="space-y-2">
-                <Label htmlFor="position">Position / Role</Label>
-                <Input id="position" name="position" value={formData.position} onChange={handleInputChange} />
-              </div>
-            </div>
-
-            {/* Physical Stats (Three-column layout) */}
-            <div className="grid grid-cols-3 gap-4 mt-6">
-              {/* Height */}
-              <div className="space-y-2">
-                <Label htmlFor="height">
-                  <Ruler className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Height (cm)
-                </Label>
-                <Input id="height" name="height" type="number" value={formData.height} onChange={handleInputChange} />
-              </div>
-              
-              {/* Weight */}
-              <div className="space-y-2">
-                <Label htmlFor="weight">
-                  <Weight className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Weight (kg)
-                </Label>
-                <Input id="weight" name="weight" type="number" value={formData.weight} onChange={handleInputChange} />
-              </div>
-              
-              {/* Jersey Number */}
-              <div className="space-y-2">
-                <Label htmlFor="jerseyNumber">
-                  <Hash className="inline-block mr-1 h-4 w-4 text-muted-foreground" /> Jersey #
-                </Label>
-                <Input
-                  id="jerseyNumber"
-                  name="jerseyNumber"
-                  type="number"
-                  value={formData.jerseyNumber}
-                  onChange={handleInputChange}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <Separator />
-
-        {/* --- SECTION 3: Biography --- */}
-        <div>
-          <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-primary">
-            <BookOpen className="inline-block mr-2 h-5 w-5" /> Biography
-          </h3>
-          <div className="space-y-2">
-            <Label htmlFor="bio">Bio / Achievements (Optional)</Label>
-            <textarea
-              id="bio"
-              name="bio"
-              className="w-full h-40 border rounded-md p-3 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-200"
-              rows={4}
-              value={formData.bio}
-              onChange={handleInputChange}
-            />
-          </div>
-        </div>
-      </div>
                 {/* Video Highlight Section */}
                 <Card className="mt-4">
                   <CardHeader>
@@ -600,9 +631,7 @@ const handleAvatarUpload = async (file: File) => {
                       }
                       placeholder="Paste your video highlight link here"
                       className="w-full h-24 border rounded-md p-2 text-sm resize-none"
-
                     />
-
                     {/* Clickable label below the textarea */}
                     <div className="text-left">
                       <Dialog>
@@ -702,41 +731,41 @@ const handleAvatarUpload = async (file: File) => {
                 {education.map((edu, index) => (
                   <Card key={index} className="p-4">
                     <div className="space-y-2">
-                    <Input
-                      placeholder="School"
-                      value={edu.school}
-                      onChange={(e) => updateEducation(index, "school", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Degree"
-                      value={edu.degree}
-                      onChange={(e) => updateEducation(index, "degree", e.target.value)}
-                    />
-                    <Input
-                      placeholder="Field"
-                      value={edu.field}
-                      onChange={(e) => updateEducation(index, "field", e.target.value)}
-                    />
-                    <div className="grid grid-cols-2 gap-4 mt-2">
                       <Input
-                        placeholder="Start Year"
-                        value={edu.startYear}
-                        onChange={(e) => updateEducation(index, "startYear", e.target.value)}
+                        placeholder="School"
+                        value={edu.school}
+                        onChange={(e) => updateEducation(index, "school", e.target.value)}
                       />
                       <Input
-                        placeholder="End Year"
-                        value={edu.endYear}
-                        onChange={(e) => updateEducation(index, "endYear", e.target.value)}
+                        placeholder="Degree"
+                        value={edu.degree}
+                        onChange={(e) => updateEducation(index, "degree", e.target.value)}
                       />
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-red-500"
-                      onClick={() => removeEducation(index)}
-                    >
-                      <X className="h-4 w-4 mr-1" /> Remove
-                    </Button>
+                      <Input
+                        placeholder="Field"
+                        value={edu.field}
+                        onChange={(e) => updateEducation(index, "field", e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-4 mt-2">
+                        <Input
+                          placeholder="Start Year"
+                          value={edu.startYear}
+                          onChange={(e) => updateEducation(index, "startYear", e.target.value)}
+                        />
+                        <Input
+                          placeholder="End Year"
+                          value={edu.endYear}
+                          onChange={(e) => updateEducation(index, "endYear", e.target.value)}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="mt-2 text-red-500"
+                        onClick={() => removeEducation(index)}
+                      >
+                        <X className="h-4 w-4 mr-1" /> Remove
+                      </Button>
                     </div>
                   </Card>
                 ))}
