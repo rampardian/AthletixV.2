@@ -9,6 +9,22 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MapPin, Calendar, Globe, ChevronLeft, Share2 } from "lucide-react";
 import { format, parseISO, endOfDay } from "date-fns";
 import EventEditModal from "@/components/events/EventEditModal";
+import axios from "axios";
+
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Users, Printer, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import * as XLSX from "xlsx";
 
 const getEventStatus = (
   startStr: string | null,
@@ -36,6 +52,185 @@ const safeFormat = (dateStr: string | null) => {
   } catch {
     return "Invalid Date";
   }
+};
+
+
+const exportParticipantsToExcel = async (eventId: string, eventData: any) => {
+  try {
+    // Fetch participants
+    const res = await axios.get(
+      `${import.meta.env.VITE_BACKEND_URL}/api/event-participants/${eventId}/participants`
+    );
+    const participants = res.data.participants;
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+
+    // Event Info Sheet
+    const eventInfo = [
+      ["Event Title", eventData.title],
+      ["Event Date", `${format(new Date(eventData.start_datetime), "PPP")} - ${format(new Date(eventData.end_datetime), "PPP")}`],
+      ["Location", eventData.location],
+      ["Sport", eventData.sport_name],
+      [""],
+      ["Total Participants", participants.length],
+    ];
+
+    const wsEventInfo = XLSX.utils.aoa_to_sheet(eventInfo);
+    XLSX.utils.book_append_sheet(wb, wsEventInfo, "Event Info");
+
+    // Participants Sheet
+    const participantData = participants.map((p: any) => ({
+      "Participant No.": p.participantNo,
+      "Name": p.name,
+      "Sport": p.sport,
+      "Location": p.location,
+      "Age": p.age,
+    }));
+
+    const wsParticipants = XLSX.utils.json_to_sheet(participantData);
+    XLSX.utils.book_append_sheet(wb, wsParticipants, "Participants");
+
+    // Download
+    XLSX.writeFile(wb, `${eventData.title}_Participants.xlsx`);
+    toast.success("Participant list exported successfully!");
+  } catch (error) {
+    console.error("Export error:", error);
+    toast.error("Failed to export participant list");
+  }
+};
+
+const EventRow = ({ event, status, userId, onEdit }: any) => {
+  const [participantCount, setParticipantCount] = useState(0);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_BACKEND_URL}/api/event-participants/${event.event_id}/count`
+        );
+        setParticipantCount(res.data.count);
+      } catch (err) {
+        console.error("Failed to fetch count:", err);
+      }
+    };
+    fetchCount();
+  }, [event.event_id]);
+
+  const handleDeleteEvent = async () => {
+    setDeleting(true);
+    try {
+      await axios.delete(
+        `${import.meta.env.VITE_BACKEND_URL}/api/events/${event.event_id}`,
+        { data: { organizerId: userId } }
+      );
+      toast.success("Event deleted successfully");
+      setShowDeleteDialog(false);
+      window.location.reload();
+    } catch (error) {
+      toast.error("Failed to delete event");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex justify-between items-start">
+          <div className="flex-1">
+            <h3 className="font-semibold text-lg mb-2">
+              <Link to={`/events/${event.event_id}`}>{event.title}</Link>
+            </h3>
+            <p className="text-muted-foreground mb-2">
+              {safeFormat(event.start_datetime)} - {safeFormat(event.end_datetime)}
+            </p>
+            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+              <Users className="h-4 w-4" />
+              <span>{participantCount} participants</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <Badge
+              variant={
+                status === "Completed"
+                  ? "destructive"
+                  : status === "Ongoing"
+                  ? "default"
+                  : "secondary"
+              }
+            >
+              {status}
+            </Badge>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => exportParticipantsToExcel(event.event_id, event)}
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => onEdit(event)}
+              >
+                Edit
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-destructive">
+                ⚠️ DELETE EVENT - THIS ACTION CANNOT BE UNDONE
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p className="font-bold">You are about to permanently delete:</p>
+                <p className="text-lg">"{event.title}"</p>
+                <p className="text-destructive font-semibold mt-4">
+                  This will remove:
+                </p>
+                <ul className="list-disc list-inside space-y-1 text-sm">
+                  <li>All event details</li>
+                  <li>All {participantCount} registered participants</li>
+                  <li>All event categories and sponsors</li>
+                  <li>This action is PERMANENT and IRREVERSIBLE</li>
+                </ul>
+                <p className="mt-4 font-bold">
+                  Are you absolutely sure you want to continue?
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>
+                No, Keep Event
+              </AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteEvent}
+                disabled={deleting}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                {deleting ? "Deleting..." : "Yes, Delete Forever"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </CardContent>
+    </Card>
+  );
 };
 
 const UserProfile = () => {
@@ -158,59 +353,31 @@ const UserProfile = () => {
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="Events" className="space-y-6">
-            <div className="grid gap-4">
-              {user.events && user.events.length > 0 ? (
-                user.events.map((event: any) => {
-                  const status = getEventStatus(event.start_datetime, event.end_datetime);
+        <TabsContent value="Events" className="space-y-6">
+          <div className="grid gap-4">
+            {user.events && user.events.length > 0 ? (
+              user.events.map((event: any) => {
+                const status = getEventStatus(event.start_datetime, event.end_datetime);
+                
+                return (
+                  <EventRow
+                    key={event.event_id}
+                    event={event}
+                    status={status}
+                    userId={user.user_id}
+                    onEdit={(evt) => {
+                      setEditEvent(evt);
+                      setModalOpen(true);
+                    }}
+                  />
+                );
+              })
+            ) : (
+              <p>No events available.</p>
+            )}
+          </div>
+        </TabsContent>
 
-                  return (
-                    <Card key={event.event_id}>
-                      <CardContent className="p-6">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <h3 className="font-semibold text-lg mb-2">
-                              <Link to={`/events/${event.event_id}`}>{event.title}</Link>
-                            </h3>
-                            <p className="text-muted-foreground">
-                              {safeFormat(event.start_datetime)} - {safeFormat(event.end_datetime)}
-                            </p>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-                            <Badge
-                              variant={
-                                status === "Completed"
-                                  ? "destructive"
-                                  : status === "Ongoing"
-                                  ? "default"
-                                  : "secondary"
-                              }
-                            >
-                              {status}
-                            </Badge>
-
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditEvent(event);
-                                setModalOpen(true);
-                              }}
-                            >
-                              Edit
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })
-              ) : (
-                <p>No events available.</p>
-              )}
-            </div>
-          </TabsContent>
 
           <TabsContent value="achievements" className="space-y-4">
             {achievements.length > 0 ? (
