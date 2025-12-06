@@ -3,11 +3,12 @@ import { supabase } from "../supabaseClient.js";
 
 const router = express.Router();
 
-
+// get drafts for user
 router.get("/drafts/:userId", async (req, res) => {
   const { userId } = req.params;
 
   try {
+    //query supabase gikan sa orig user
     const { data: drafts, error } = await supabase
       .from("news_drafts")
       .select("*")
@@ -30,11 +31,12 @@ router.get("/drafts/:userId", async (req, res) => {
   }
 });
 
-
+//save or update news draft
 router.post("/drafts/save", async (req, res) => {
   const { draft_id, user_id, title, event_date, location, content, category } = req.body;
 
   try {
+    //if draft_id exists, update existing draft
     if (draft_id) {
       const { data, error } = await supabase
         .from("news_drafts")
@@ -46,8 +48,8 @@ router.post("/drafts/save", async (req, res) => {
           category,
           last_modified: new Date().toISOString(), 
         })
-        .eq("draft_id", draft_id)
-        .eq("user_id", user_id) 
+        .eq("draft_id", draft_id) //update correct draft
+        .eq("user_id", user_id) //ensure draft belongs to user
         .select()
         .single();
 
@@ -58,6 +60,8 @@ router.post("/drafts/save", async (req, res) => {
         message: "Draft updated successfully",
         draft_id: data.draft_id,
       });
+
+      //if draft_id not exists, create new draft
     } else {
       const { data, error } = await supabase
         .from("news_drafts")
@@ -92,7 +96,7 @@ router.post("/drafts/save", async (req, res) => {
   }
 });
 
-
+// delete news draft
 router.delete("/drafts/:draftId", async (req, res) => {
   const { draftId } = req.params;
 
@@ -100,7 +104,7 @@ router.delete("/drafts/:draftId", async (req, res) => {
     const { error } = await supabase
       .from("news_drafts")
       .delete()
-      .eq("draft_id", draftId);
+      .eq("draft_id", draftId); // delete @ primary key
 
     if (error) throw error;
 
@@ -118,11 +122,12 @@ router.delete("/drafts/:draftId", async (req, res) => {
   }
 });
 
-
+//publish article
 router.post("/publish", async (req, res) => {
   const { user_id, title, event_date, location, content, category } = req.body;
 
   try {
+    //fetch user fullname from users table
     const { data: userData, error: userError } = await supabase
       .from("users")
       .select("fullname")
@@ -138,8 +143,9 @@ router.post("/publish", async (req, res) => {
 
     const author_name = userData.fullname;
 
+    //insert the article into published news table
     const { data: newsData, error: newsError } = await supabase
-      .from("news")
+      .from("newsPublished")
       .insert([
         {
           user_id,
@@ -171,10 +177,12 @@ router.post("/publish", async (req, res) => {
   }
 });
 
+
+//get all published news articles
 router.get("/", async (req, res) => {
   try {
     const { data: articles, error } = await supabase
-      .from("news")
+      .from("newsPublished")
       .select("*")
       .order("publish_date", { ascending: false }); // Most recent first
 
@@ -194,12 +202,13 @@ router.get("/", async (req, res) => {
   }
 });
 
+//fetch article by ID
 router.get("/:newsId", async (req, res) => {
   const { newsId } = req.params;
 
   try {
     const { data: article, error } = await supabase
-      .from("news")
+      .from("newsPublished")
       .select("*")
       .eq("news_id", newsId)
       .single();
