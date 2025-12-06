@@ -9,30 +9,14 @@ router.post("/:eventId/join", async (req, res) => {
   const { userId } = req.body;
 
   try {
-    // Get user's sport
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("sport_name")
-      .eq("user_id", userId)
-      .single();
-
-    if (userError) throw userError;
-
-    // Get event's sport
+    // Verify event exists
     const { data: eventData, error: eventError } = await supabase
       .from("events")
-      .select("sport_name")
+      .select("event_id")
       .eq("event_id", eventId)
       .single();
 
     if (eventError) throw eventError;
-
-    // Check if sports match
-    if (userData.sport_name !== eventData.sport_name) {
-      return res.status(400).json({
-        message: "You can only join events that match your sport type.",
-      });
-    }
 
     // Check if already joined
     const { data: existing } = await supabase
@@ -82,6 +66,7 @@ router.delete("/:eventId/leave", async (req, res) => {
 });
 
 // Get participants for an event
+// Get participants for an event
 router.get("/:eventId/participants", async (req, res) => {
   const { eventId } = req.params;
 
@@ -96,7 +81,8 @@ router.get("/:eventId/participants", async (req, res) => {
           fullname,
           sport_name,
           location,
-          birthdate
+          birthdate,
+          gender
         )
       `)
       .eq("event_id", eventId);
@@ -109,6 +95,8 @@ router.get("/:eventId/participants", async (req, res) => {
       name: p.users.fullname,
       sport: p.users.sport_name,
       location: p.users.location,
+      gender: p.users.gender,
+      birthdate: p.users.birthdate,
       age: p.users.birthdate
         ? new Date().getFullYear() - new Date(p.users.birthdate).getFullYear()
         : "N/A",

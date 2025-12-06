@@ -71,7 +71,7 @@ router.get("/:id", async (req, res) => {
       .filter(Boolean);
 
     // Return combined event and organizer info
-    res.json({
+   res.json({
       ...event,
       date: event.start_datetime ? new Date(event.start_datetime) : null,
       endDate: event.end_datetime ? new Date(event.end_datetime) : null,

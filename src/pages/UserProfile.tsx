@@ -57,7 +57,7 @@ const safeFormat = (dateStr: string | null) => {
 
 const exportParticipantsToExcel = async (eventId: string, eventData: any) => {
   try {
-    // Fetch participants
+    // Fetch participants with full user details
     const res = await axios.get(
       `${import.meta.env.VITE_BACKEND_URL}/api/event-participants/${eventId}/participants`
     );
@@ -66,12 +66,14 @@ const exportParticipantsToExcel = async (eventId: string, eventData: any) => {
     // Create workbook
     const wb = XLSX.utils.book_new();
 
-    // Event Info Sheet
+    // Event Info Sheet with updated fields including organizer name
     const eventInfo = [
       ["Event Title", eventData.title],
-      ["Event Date", `${format(new Date(eventData.start_datetime), "PPP")} - ${format(new Date(eventData.end_datetime), "PPP")}`],
+      ["Event Description", eventData.description || "N/A"],
+      ["Event Start Date", format(new Date(eventData.start_datetime), "PPP p")],
+      ["Event End Date", format(new Date(eventData.end_datetime), "PPP p")],
       ["Location", eventData.location],
-      ["Sport", eventData.sport_name],
+      ["Event Organizer", eventData.organizer_name || "N/A"], // This now uses organizer_name from the event data
       [""],
       ["Total Participants", participants.length],
     ];
@@ -79,13 +81,15 @@ const exportParticipantsToExcel = async (eventId: string, eventData: any) => {
     const wsEventInfo = XLSX.utils.aoa_to_sheet(eventInfo);
     XLSX.utils.book_append_sheet(wb, wsEventInfo, "Event Info");
 
-    // Participants Sheet
+    // Participants Sheet with all required fields
     const participantData = participants.map((p: any) => ({
-      "Participant No.": p.participantNo,
+      "User ID": p.userId,
       "Name": p.name,
+      "Gender": p.gender || "N/A",
       "Sport": p.sport,
       "Location": p.location,
       "Age": p.age,
+      "Birthday": p.birthdate ? format(new Date(p.birthdate), "PPP") : "N/A",
     }));
 
     const wsParticipants = XLSX.utils.json_to_sheet(participantData);
@@ -100,7 +104,7 @@ const exportParticipantsToExcel = async (eventId: string, eventData: any) => {
   }
 };
 
-const EventRow = ({ event, status, userId, onEdit }: any) => {
+const EventRow = ({ event, status, userId, onEdit, isOwnProfile }: any) => {
   const [participantCount, setParticipantCount] = useState(0);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -152,43 +156,47 @@ const EventRow = ({ event, status, userId, onEdit }: any) => {
               <span>{participantCount} participants</span>
             </div>
           </div>
-          <div className="flex flex-col items-end gap-2">
-            <Badge
-              variant={
-                status === "Completed"
-                  ? "destructive"
-                  : status === "Ongoing"
-                  ? "default"
-                  : "secondary"
-              }
-            >
-              {status}
-            </Badge>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => exportParticipantsToExcel(event.event_id, event)}
+            <div className="flex flex-col items-end gap-2">
+              <Badge
+                variant={
+                  status === "Completed"
+                    ? "destructive"
+                    : status === "Ongoing"
+                    ? "default"
+                    : "secondary"
+                }
               >
-                <Printer className="h-4 w-4 mr-1" />
-                Print
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onEdit(event)}
-              >
-                Edit
-              </Button>
-              <Button
-                size="sm"
-                variant="destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+                {status}
+              </Badge>
+              
+              {/* Only show buttons if viewing own profile */}
+              {isOwnProfile && (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => exportParticipantsToExcel(event.event_id, event)}
+                  >
+                    <Printer className="h-4 w-4 mr-1" />
+                    Print
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onEdit(event)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>
         </div>
 
         <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
@@ -235,13 +243,18 @@ const EventRow = ({ event, status, userId, onEdit }: any) => {
 
 const UserProfile = () => {
   const { id } = useParams();
-
+  
   const [editEvent, setEditEvent] = useState<any>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [achievements, setAchievements] = useState<any[]>([]);
-
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Add these lines:
+  const currentUserId = localStorage.getItem("userId");
+  const currentUserRole = localStorage.getItem("userRole");
+  const isOwnProfile = currentUserId === id;
+  const isOrganizer = currentUserRole === "organizer";
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -353,30 +366,31 @@ const UserProfile = () => {
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
-        <TabsContent value="Events" className="space-y-6">
-          <div className="grid gap-4">
-            {user.events && user.events.length > 0 ? (
-              user.events.map((event: any) => {
-                const status = getEventStatus(event.start_datetime, event.end_datetime);
-                
-                return (
-                  <EventRow
-                    key={event.event_id}
-                    event={event}
-                    status={status}
-                    userId={user.user_id}
-                    onEdit={(evt) => {
-                      setEditEvent(evt);
-                      setModalOpen(true);
-                    }}
-                  />
-                );
-              })
-            ) : (
-              <p>No events available.</p>
-            )}
-          </div>
-        </TabsContent>
+          <TabsContent value="Events" className="space-y-6">
+            <div className="grid gap-4">
+              {user.events && user.events.length > 0 ? (
+                user.events.map((event: any) => {
+                  const status = getEventStatus(event.start_datetime, event.end_datetime);
+                  
+                  return (
+                    <EventRow
+                      key={event.event_id}
+                      event={event}
+                      status={status}
+                      userId={user.user_id}
+                      isOwnProfile={isOwnProfile && isOrganizer} 
+                      onEdit={(evt) => {
+                        setEditEvent(evt);
+                        setModalOpen(true);
+                      }}
+                    />
+                  );
+                })
+              ) : (
+                <p>No events available.</p>
+              )}
+            </div>
+          </TabsContent>
 
 
           <TabsContent value="achievements" className="space-y-4">

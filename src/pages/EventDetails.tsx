@@ -31,6 +31,8 @@ import { toast } from "sonner";
 import { useUserRole } from "@/hooks/useUserRole";
 import ParticipantCard from "@/components/events/ParticipantCard";
 import axios from "axios";
+import { Link } from "react-router-dom";
+
 
 export default function EventDetails() {
   const { id } = useParams();
@@ -45,30 +47,44 @@ export default function EventDetails() {
   const [actionLoading, setActionLoading] = useState(false);
   const [showResignDialog, setShowResignDialog] = useState(false);
 
+const calculateEventStatus = (startDate: Date | null, endDate: Date | null): "upcoming" | "ongoing" | "completed" => {
+  if (!startDate || !endDate) return "upcoming";
+  
+  const now = new Date();
+  
+  if (now < startDate) return "upcoming";
+  if (now >= startDate && now <= endDate) return "ongoing";
+  return "completed";
+};
+
   useEffect(() => {
     const loadEvent = async () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/events/${id}`);
         const data = await res.json();
 
-        const mappedEvent = {
-          ...data,
-          date: data.start_datetime ? new Date(data.start_datetime) : null,
-          endDate: data.end_datetime ? new Date(data.end_datetime) : null,
-          sport: data.sport_name,
-          event_id: data.event_id,
-          categories: data.categories || [],
-          sponsors: data.sponsors || [],
-          rules: ["Rule 1: Follow instructions", "Rule 2: No cheating"],
-          coverImage: data.coverImage || "https://via.placeholder.com/800x400",
-          organizer: data.organizer_name,
-          organizer_id: data.organizer_id,
-          contactEmail: data.organizer_email || "email@example.com",
-          contactPhone: data.organizer_phone || "123-456-7890",
-          participantCount: data.participantCount || 0,
-          type: data.type,
-          status: data.status,
-        };
+          const mappedEvent = {
+            ...data,
+            date: data.start_datetime ? new Date(data.start_datetime) : null,
+            endDate: data.end_datetime ? new Date(data.end_datetime) : null,
+            sport: data.sport_name,
+            event_id: data.event_id,
+            categories: data.categories || [],
+            sponsors: data.sponsors || [],
+            rules: ["Rule 1: Follow instructions", "Rule 2: No cheating"],
+            coverImage: data.coverImage || "https://via.placeholder.com/800x400",
+            organizer: data.organizer_name,
+            organizer_id: data.organizer_id,
+            contactEmail: data.organizer_email || "email@example.com",
+            contactPhone: data.organizer_phone || "123-456-7890",
+            participantCount: data.participantCount || 0,
+            type: data.type,
+            // Recalculate status based on dates
+            status: calculateEventStatus(
+              data.start_datetime ? new Date(data.start_datetime) : null,
+              data.end_datetime ? new Date(data.end_datetime) : null
+            ),
+          };
 
         setEvent(mappedEvent);
 
@@ -379,7 +395,12 @@ const showResignButton =
                 <CardTitle>Event Organizer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="font-medium">{event.organizer}</p>
+                <Link 
+                  to={`/users/${event.organizer_id}`}
+                  className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors duration-200 cursor-pointer block"
+                >
+                  {event.organizer}
+                </Link>
                 <div className="space-y-2 text-sm text-muted-foreground">
                   <p className="flex items-center gap-1 text-black">
                     <Mail className="h-4 w-4" />
