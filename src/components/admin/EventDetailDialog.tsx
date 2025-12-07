@@ -1,4 +1,10 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import React from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Trash2, Edit } from "lucide-react";
 
@@ -36,15 +42,38 @@ const EventDetailsDialog = ({ open, onClose, event, onDelete, onEdit }: EventDet
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <p><span className="font-medium">Title:</span> {event.title}</p>
-            <p><span className="font-medium">Organizer:</span> {event.organizer}</p>
-            <p><span className="font-medium">Type:</span> {event.type}</p>
-            <p><span className="font-medium">Sport:</span> {event.sport}</p>
-            <p><span className="font-medium">Start Date & Time:</span> {event.startdatetime}</p>
-            <p><span className="font-medium">End Date & Time:</span> {event.enddatetime}</p>
-            <p><span className="font-medium">Participants:</span> {event.participants}</p>
-            <p><span className="font-medium">Status:</span> {event.status}</p>
-            <p><span className="font-medium">Description:</span> {event.description}</p>
+            <p>
+              <span className="font-medium">Title:</span> {event.title}
+            </p>
+            <p>
+              <span className="font-medium">Organizer:</span>{" "}
+              {event.organizer}
+            </p>
+            <p>
+              <span className="font-medium">Type:</span> {event.type}
+            </p>
+            <p>
+              <span className="font-medium">Sport:</span> {event.sport}
+            </p>
+            <p>
+              <span className="font-medium">Start Date & Time:</span>{" "}
+              {event.startdatetime}
+            </p>
+            <p>
+              <span className="font-medium">End Date & Time:</span>{" "}
+              {event.enddatetime}
+            </p>
+            <p>
+              <span className="font-medium">Participants:</span>{" "}
+              {event.participants}
+            </p>
+            <p>
+              <span className="font-medium">Status:</span> {event.status}
+            </p>
+            <p>
+              <span className="font-medium">Description:</span>{" "}
+              {event.description}
+            </p>
           </div>
 
           {/* Action Section */}
@@ -63,7 +92,7 @@ const EventDetailsDialog = ({ open, onClose, event, onDelete, onEdit }: EventDet
               </Button>
             )}
             <Button 
-              variant="destructive" 
+              variant="destructive"
               onClick={() => {
                 onDelete(event.id || event.event_id || 0);
                 onClose();
