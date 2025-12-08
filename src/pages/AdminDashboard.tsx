@@ -147,6 +147,64 @@ const AdminDashboard = () => {
     fetchUsers();
   }, []);
 
+  // Fetch events from server
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/create-events");
+        if (!res.ok) throw new Error("Failed to fetch events");
+
+        const data = await res.json();
+        const fetchedEvents = (data.events || []).map((event: any) => {
+          // Calculate status based on dates
+          const now = new Date();
+          const startDate = new Date(event.start_datetime);
+          const endDate = new Date(event.end_datetime);
+          let status: "upcoming" | "ongoing" | "completed" = "upcoming";
+          if (now < startDate) status = "upcoming";
+          else if (now >= startDate && now <= endDate) status = "ongoing";
+          else status = "completed";
+
+          return {
+            event_id: event.event_id,
+            id: event.event_id,
+            title: event.title,
+            organizer: event.organizer_name || "Admin",
+            type: event.type,
+            sport: event.sport_name,
+            startdatetime: event.start_datetime,
+            enddatetime: event.end_datetime,
+            participants: event.participants || 0,
+            status: status,
+            description: event.description || "",
+          };
+        });
+        setEvents(fetchedEvents);
+      } catch (err) {
+        console.error("Failed to fetch events:", err);
+      }
+    };
+
+    fetchEvents();
+  }, []);
+
+  // Fetch news from server
+  useEffect(() => {
+    const fetchNews = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/news");
+        if (!res.ok) throw new Error("Failed to fetch news");
+
+        const data = await res.json();
+        setNews(data.articles || []);
+      } catch (err) {
+        console.error("Failed to fetch news:", err);
+      }
+    };
+
+    fetchNews();
+  }, []);
+
   const [news, setNews] = useState<NewsArticle[]>([
     {
       news_id: "1",
@@ -280,7 +338,7 @@ const AdminDashboard = () => {
       if (!response.ok) throw new Error("Failed to delete event");
 
       // Remove event from local state
-      setEvents(prev => prev.filter(e => (e.event_id || e.id) !== eventId));
+      setEvents((prev) => prev.filter((e) => (e.event_id || e.id) !== eventId));
       setSelectedEvent(null); // Close the dialog
       alert("Event deleted successfully");
     } catch (error) {
@@ -297,24 +355,26 @@ const AdminDashboard = () => {
     // Update the event in the local state
     // The updatedEvent from the API has event_id
     const eventId = updatedEvent.event_id || updatedEvent.id;
-    setEvents(prev => prev.map(e => {
-      // Check if this is the event that was updated
-      const currentId = e.event_id || e.id;
-      if (currentId === eventId) {
-        return {
-          ...e,
-          event_id: eventId,
-          id: eventId,
-          title: updatedEvent.title || e.title,
-          type: updatedEvent.type || e.type,
-          sport: updatedEvent.sport_name || updatedEvent.sport || e.sport,
-          startdatetime: updatedEvent.start_datetime || e.startdatetime,
-          enddatetime: updatedEvent.end_datetime || e.enddatetime,
-          description: updatedEvent.description || e.description,
-        };
-      }
-      return e;
-    }));
+    setEvents((prev) =>
+      prev.map((e) => {
+        // Check if this is the event that was updated
+        const currentId = e.event_id || e.id;
+        if (currentId === eventId) {
+          return {
+            ...e,
+            event_id: eventId,
+            id: eventId,
+            title: updatedEvent.title || e.title,
+            type: updatedEvent.type || e.type,
+            sport: updatedEvent.sport_name || updatedEvent.sport || e.sport,
+            startdatetime: updatedEvent.start_datetime || e.startdatetime,
+            enddatetime: updatedEvent.end_datetime || e.enddatetime,
+            description: updatedEvent.description || e.description,
+          };
+        }
+        return e;
+      })
+    );
     setIsEventEditOpen(false);
     setSelectedEvent(null);
   };
@@ -325,9 +385,9 @@ const AdminDashboard = () => {
 
   const handleNewsUpdated = (updatedNews: NewsArticle) => {
     // Update the news article in the local state
-    setNews(prev => prev.map(n => 
-      n.news_id === updatedNews.news_id ? updatedNews : n
-    ));
+    setNews((prev) =>
+      prev.map((n) => (n.news_id === updatedNews.news_id ? updatedNews : n))
+    );
     setIsNewsEditOpen(false);
     setSelectedNews(null);
   };
@@ -357,13 +417,13 @@ const AdminDashboard = () => {
       description: newEvent.description || "",
     };
 
-    setEvents(prev => [...prev, eventToAdd]);
+    setEvents((prev) => [...prev, eventToAdd]);
     setIsEventCreateOpen(false);
   };
 
   const handleNewsCreated = (newNews: NewsArticle) => {
     // Add the new news article to the local state
-    setNews(prev => [...prev, newNews]);
+    setNews((prev) => [...prev, newNews]);
     setIsNewsCreateOpen(false);
   };
 
@@ -473,7 +533,6 @@ const AdminDashboard = () => {
     );
   };
 
-
   const handleCreateNewsSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -557,7 +616,11 @@ const AdminDashboard = () => {
         </header>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="space-y-6"
+        >
           <TabsList className="grid w-full grid-cols-5 lg:w-auto p-1 rounded-lg">
             <TabsTrigger value="overview" className="gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -586,7 +649,9 @@ const AdminDashboard = () => {
             <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <Card className="bg-slate-800 dark:bg-slate-900 text-white shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Total Users</CardTitle>
+                  <CardTitle className="text-sm font-medium text-white">
+                    Total Users
+                  </CardTitle>
                   <Users className="h-5 w-5 text-white opacity-80" />
                 </CardHeader>
                 <CardContent>
@@ -599,33 +664,45 @@ const AdminDashboard = () => {
 
               <Card className="bg-slate-800 dark:bg-slate-900 text-white shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Total Events</CardTitle>
+                  <CardTitle className="text-sm font-medium text-white">
+                    Total Events
+                  </CardTitle>
                   <Calendar className="h-5 w-5 text-white opacity-80" />
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-white">{totalEvents}</p>
-                  <p className="text-xs text-white/80 mt-1">Active and upcoming</p>
+                  <p className="text-xs text-white/80 mt-1">
+                    Active and upcoming
+                  </p>
                 </CardContent>
               </Card>
 
               <Card className="bg-slate-800 dark:bg-slate-900 text-white shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Published News</CardTitle>
+                  <CardTitle className="text-sm font-medium text-white">
+                    Published News
+                  </CardTitle>
                   <Newspaper className="h-5 w-5 text-white opacity-80" />
                 </CardHeader>
                 <CardContent>
                   <p className="text-3xl font-bold text-white">{totalNews}</p>
-                  <p className="text-xs text-white/80 mt-1">Articles published</p>
+                  <p className="text-xs text-white/80 mt-1">
+                    Articles published
+                  </p>
                 </CardContent>
               </Card>
 
               <Card className="bg-slate-800 dark:bg-slate-900 text-white shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-white">Athletes Tracked</CardTitle>
+                  <CardTitle className="text-sm font-medium text-white">
+                    Athletes Tracked
+                  </CardTitle>
                   <TrendingUp className="h-5 w-5 text-white opacity-80" />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-3xl font-bold text-white">{athleteStats.length}</p>
+                  <p className="text-3xl font-bold text-white">
+                    {athleteStats.length}
+                  </p>
                   <p className="text-xs text-white/80 mt-1">With statistics</p>
                 </CardContent>
               </Card>
@@ -787,7 +864,10 @@ const AdminDashboard = () => {
                   Organize and track sporting events
                 </p>
               </div>
-              <Button className="gap-2" onClick={() => setIsEventCreateOpen(true)}>
+              <Button
+                className="gap-2"
+                onClick={() => setIsEventCreateOpen(true)}
+              >
                 <Calendar className="h-4 w-4" />
                 Create Event
               </Button>
@@ -812,7 +892,9 @@ const AdminDashboard = () => {
                   <TableBody>
                     {events.map((event) => (
                       <TableRow key={event.event_id || event.id}>
-                        <TableCell className="font-medium">{event.title}</TableCell>
+                        <TableCell className="font-medium">
+                          {event.title}
+                        </TableCell>
                         <TableCell>{event.organizer}</TableCell>
                         <TableCell>{event.type}</TableCell>
                         <TableCell>{event.sport}</TableCell>
@@ -859,7 +941,10 @@ const AdminDashboard = () => {
                   Publish and manage news articles
                 </p>
               </div>
-              <Button className="gap-2" onClick={() => setIsNewsCreateOpen(true)}>
+              <Button
+                className="gap-2"
+                onClick={() => setIsNewsCreateOpen(true)}
+              >
                 <Newspaper className="h-4 w-4" />
                 Create Article
               </Button>
@@ -962,7 +1047,9 @@ const AdminDashboard = () => {
                     <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
                       <div className="flex items-center justify-center gap-2">
                         <FileSpreadsheet className="h-5 w-5 text-foreground" />
-                        <span className="text-sm font-medium">{uploadedFile.name}</span>
+                        <span className="text-sm font-medium">
+                          {uploadedFile.name}
+                        </span>
                       </div>
                       <div className="mt-3 flex gap-2 justify-center">
                         <Button size="sm" onClick={handleUploadStats}>
@@ -997,19 +1084,23 @@ const AdminDashboard = () => {
       <EventDetailsDialog
         open={!!selectedEvent}
         onClose={() => setSelectedEvent(null)}
-        event={selectedEvent ? {
-          id: selectedEvent.id || selectedEvent.event_id,
-          event_id: selectedEvent.event_id,
-          title: selectedEvent.title,
-          organizer: selectedEvent.organizer,
-          type: selectedEvent.type,
-          sport: selectedEvent.sport,
-          startdatetime: selectedEvent.startdatetime,
-          enddatetime: selectedEvent.enddatetime,
-          participants: selectedEvent.participants,
-          status: selectedEvent.status,
-          description: selectedEvent.description,
-        } : null}
+        event={
+          selectedEvent
+            ? {
+                id: selectedEvent.id || selectedEvent.event_id,
+                event_id: selectedEvent.event_id,
+                title: selectedEvent.title,
+                organizer: selectedEvent.organizer,
+                type: selectedEvent.type,
+                sport: selectedEvent.sport,
+                startdatetime: selectedEvent.startdatetime,
+                enddatetime: selectedEvent.enddatetime,
+                participants: selectedEvent.participants,
+                status: selectedEvent.status,
+                description: selectedEvent.description,
+              }
+            : null
+        }
         onDelete={handleDeleteEvent}
         onEdit={handleEditEvent}
       />
@@ -1031,7 +1122,9 @@ const AdminDashboard = () => {
             setIsEventEditOpen(false);
             setSelectedEvent(null);
           }}
-          event={{ event_id: selectedEvent.event_id || selectedEvent.id } as any}
+          event={
+            { event_id: selectedEvent.event_id || selectedEvent.id } as any
+          }
           onEventUpdated={handleEventUpdated}
         />
       )}

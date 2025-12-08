@@ -19,7 +19,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import type { NewsArticle } from "@/pages/AdminDashboard";
 
@@ -38,7 +44,12 @@ interface NewsEditModalProps {
   onNewsUpdated: (updatedNews: NewsArticle) => void;
 }
 
-export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: NewsEditModalProps) {
+export default function NewsEditModal({
+  open,
+  onClose,
+  news,
+  onNewsUpdated,
+}: NewsEditModalProps) {
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(true);
@@ -59,24 +70,43 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
     if (open && news?.news_id) {
       setLoadingDetails(true);
       fetch(`http://localhost:5000/api/news/${news.news_id}`)
-        .then(res => res.json())
-        .then(data => {
+        .then((res) => {
+          if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
+          return res.json();
+        })
+        .then((data) => {
           if (data.success && data.article) {
             const article = data.article;
             form.reset({
               title: article.title || "",
               category: article.category || "",
-              event_date: article.event_date ? article.event_date.split('T')[0] : "",
+              event_date: article.event_date
+                ? article.event_date.split("T")[0]
+                : "",
               location: article.location || "",
               content: article.content || "",
             });
+          } else if (data.article) {
+            // Handle case where response doesn't have success flag
+            const article = data.article;
+            form.reset({
+              title: article.title || "",
+              category: article.category || "",
+              event_date: article.event_date
+                ? article.event_date.split("T")[0]
+                : "",
+              location: article.location || "",
+              content: article.content || "",
+            });
+          } else {
+            throw new Error("Invalid response format");
           }
         })
-        .catch(err => {
+        .catch((err) => {
           console.error("Failed to fetch news details:", err);
           toast({
             title: "Error",
-            description: "Failed to load news details",
+            description: err.message || "Failed to load news details",
             variant: "destructive",
           });
         })
@@ -89,20 +119,24 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/news/${news.news_id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: values.title,
-          category: values.category,
-          event_date: values.event_date || null,
-          location: values.location || null,
-          content: values.content,
-        }),
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/news/${news.news_id}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: values.title,
+            category: values.category,
+            event_date: values.event_date || null,
+            location: values.location || null,
+            content: values.content,
+          }),
+        }
+      );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.message || "Failed to update news");
+      if (!response.ok)
+        throw new Error(result.message || "Failed to update news");
 
       // Update the news article with the response
       const updatedNews: NewsArticle = {
@@ -152,7 +186,10 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+          <form
+            onSubmit={form.handleSubmit(handleSubmit)}
+            className="space-y-6"
+          >
             <FormField
               control={form.control}
               name="title"
@@ -184,7 +221,9 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
                       <SelectItem value="Soccer">Soccer</SelectItem>
                       <SelectItem value="Football">Football</SelectItem>
                       <SelectItem value="Swimming">Swimming</SelectItem>
-                      <SelectItem value="Track & Field">Track & Field</SelectItem>
+                      <SelectItem value="Track & Field">
+                        Track & Field
+                      </SelectItem>
                       <SelectItem value="Volleyball">Volleyball</SelectItem>
                       <SelectItem value="Baseball">Baseball</SelectItem>
                       <SelectItem value="Facilities">Facilities</SelectItem>
@@ -218,7 +257,10 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
                   <FormItem>
                     <FormLabel>Location</FormLabel>
                     <FormControl>
-                      <Input {...field} placeholder="e.g., Manila Sports Complex" />
+                      <Input
+                        {...field}
+                        placeholder="e.g., Manila Sports Complex"
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -245,7 +287,12 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
             />
 
             <div className="flex gap-3">
-              <Button type="button" variant="outline" onClick={onClose} className="flex-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
+              >
                 Cancel
               </Button>
               <Button type="submit" className="flex-1" disabled={isSubmitting}>
@@ -258,4 +305,3 @@ export default function NewsEditModal({ open, onClose, news, onNewsUpdated }: Ne
     </Dialog>
   );
 }
-
