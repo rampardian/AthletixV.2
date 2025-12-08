@@ -43,7 +43,12 @@ const News = () => {
       const data = await response.json();
 
       if (data.success && data.articles) {
-        setArticles(data.articles);
+        // sort by recenty
+        const sorted = [...data.articles].sort((a, b) =>
+          new Date(b.publish_date).getTime() - new Date(a.publish_date).getTime()
+        );
+        
+        setArticles(sorted);
       }
     } catch (error) {
       console.error("Error fetching articles:", error);
